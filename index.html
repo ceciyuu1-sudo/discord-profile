@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Vanitas — live Discord presence, music and games.">
+    <meta name="theme-color" content="#0a0a0c">
+    <title>𝐕𝐚𝐧𝐢𝐭𝐚𝐬 ✤ | Profile</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Space+Grotesk:wght@500;700&family=Newsreader:ital,wght@1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body data-status="offline">
+
+    <video class="bg-video" autoplay muted loop playsinline preload="auto" aria-hidden="true">
+        <source src="bg.webm" type="video/webm">
+        <source src="bg.mp4"  type="video/mp4">
+    </video>
+
+    <div class="background-overlay" aria-hidden="true"></div>
+    <canvas id="bg-canvas" aria-hidden="true"></canvas>
+
+    <button class="mute-btn" id="mute-btn" type="button" aria-pressed="false" hidden>
+        <span id="mute-icon" aria-hidden="true">🔇</span>
+        <span id="mute-label">Play music</span>
+    </button>
+
+    <div class="hero">
+    <main class="container">
+        <section class="profile-card" aria-label="Profile">
+            <div class="banner"><img id="banner-img" alt="" hidden></div>
+            <div class="profile-content">
+                <div class="avatar-container">
+                    <img id="avatar-decoration" class="decoration" alt="" hidden>
+                    <img id="avatar" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Profile picture" width="90" height="90">
+                    <div id="status-indicator" class="status offline" role="img" aria-label="Status: offline"></div>
+                </div>
+
+                <div class="user-info">
+                    <div class="name-row">
+                        <h1 id="username">𝐕𝐚𝐧𝐢𝐭𝐚𝐬 ✤</h1>
+                        <span id="username-tag">@couldbeyuu</span>
+                        <span class="dot-separator">•</span>
+                        <span id="clan-tag" class="clan-tag" hidden></span>
+                        <span id="status-label" class="status-label">Offline</span>
+                    </div>
+
+                    <ul id="badges" class="badges" aria-label="Discord badges" hidden></ul>
+
+                    <!-- Discord Server Popover (Hidden by default, shows on hover) -->
+                    <div id="clan-popover" class="clan-popover" hidden>
+                        <div class="popover-banner">
+                            <!-- Replace with your actual banner URL -->
+                            <img src="img/re-banner.png" alt="Server Banner">
+                        </div>
+                        <div class="popover-header">
+                            <!-- Replace with your actual icon URL -->
+                            <img src="img/re-icon.png" alt="Server Icon" class="popover-icon">
+                            <div class="popover-title-row">
+                                <h4>Resident Evil Community</h4>
+                                <span class="popover-badge">✤</span>
+                            </div>
+                        </div>
+                        <div class="popover-body">
+                            <div class="popover-stats">
+                                <span><span class="dot online"></span> 17,690 Online</span>
+                                <span><span class="dot members"></span> 56,170 Members</span>
+                            </div>
+                            <p class="popover-created">Est. Jun 2022</p>
+                            <p class="popover-desc">Welcome to the Resident Evil Community! We are a community based around the franchise, Resident Evil! Join to discuss your fave games, movies, make new friends and more! All are welcome here!</p>
+                            <div class="popover-tags">
+                                <span>Resident Evil</span>
+                                <span>Horror</span>
+                                <span>Games</span>
+                                <span>Gaming</span>
+                                <span>+ 1 more</span>
+                            </div>
+                            <!-- Replace # with your actual invite link -->
+                            <a href="https://discord.gg/77bEazQYv6" class="popover-btn" target="_blank" rel="noopener noreferrer">Go to Server</a>
+                        </div>
+                    </div>
+
+                    <p id="custom-status" class="custom-status" hidden></p>
+
+                    <div class="bio-section">
+                        <p class="bio-text">Tutto arriva nella vita, presto o tardi.</p>
+                        <p class="location">📍 Morocco</p>
+                    </div>
+                </div>
+
+                <div class="activity-status" id="activity-status" aria-live="polite">
+                    <p>🎮 No active game detected</p>
+                </div>
+            </div>
+        </section>
+
+        <nav class="socials" id="socials" aria-label="Social links"></nav>
+
+        <div class="activity-grid">
+            <section class="card spotify-card" aria-labelledby="spotify-title">
+                <h3 id="spotify-title">Listen with me</h3>
+                <div id="spotify-content" class="card-content" aria-live="polite">
+                    <p>Nothing playing</p>
+                    <p class="sub-text">Start Spotify and your track shows up here live.</p>
+                </div>
+            </section>
+
+            <section class="card game-card" aria-labelledby="game-title">
+                <h3 id="game-title">Play with me</h3>
+                <div id="game-content" class="card-content" aria-live="polite">
+                    <p>No game right now</p>
+                    <p class="sub-text">Whatever is being played appears here automatically.</p>
+                </div>
+            </section>
+        </div>
+
+        <p class="footnote" id="footnote">Connecting…</p>
+    </main>
+
+    <a href="#about" class="scroll-cue" id="scroll-cue" aria-label="Scroll to About me">
+        <span>About me</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </a>
+    </div>
+
+    <!-- ================= ABOUT ME ================= -->
+    <section class="about" id="about" aria-labelledby="about-title">
+        <header class="about-head">
+            <p class="eyebrow">About me</p>
+            <h2 id="about-title">What I'm into</h2>
+            <p class="about-intro">Tap a card to read what it's about, or hit the link to open it.</p>
+        </header>
+
+        <section class="fav" aria-labelledby="h-movies">
+            <h3 class="eyebrow" id="h-movies">Favorite movies</h3>
+            <div class="grid" id="fav-movies"></div>
+        </section>
+
+        <section class="fav" aria-labelledby="h-tv">
+            <h3 class="eyebrow" id="h-tv">Favorite TV shows</h3>
+            <div class="grid" id="fav-tv"></div>
+        </section>
+
+        <section class="fav" aria-labelledby="h-anime">
+            <h3 class="eyebrow" id="h-anime">Favorite anime</h3>
+            <div class="grid" id="fav-anime"></div>
+        </section>
+
+        <section class="fav" aria-labelledby="h-games">
+            <h3 class="eyebrow" id="h-games">Favorite games</h3>
+            <div class="grid" id="fav-games"></div>
+        </section>
+
+        <blockquote class="about-quote">
+            <p>“True love begins when nothing is looked for in return.”</p>
+            <cite>— Antoine de Saint-Exupéry</cite>
+        </blockquote>
+    </section>
+
+    <!-- Image preview (opens when the banner or avatar is clicked) -->
+    <div id="lightbox" class="lightbox" role="dialog" aria-modal="true" aria-label="Image preview" hidden>
+        <div class="lightbox-tools">
+            <button id="lightbox-zoom" class="lightbox-btn" type="button" aria-label="Toggle zoom" aria-pressed="false">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4M11 8v6M8 11h6"/></svg>
+            </button>
+            <button id="lightbox-close" class="lightbox-btn" type="button" aria-label="Close preview">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+        </div>
+        <div class="lightbox-stage" id="lightbox-stage">
+            <img id="lightbox-img" alt="">
+        </div>
+    </div>
+
+    <audio id="bgm" loop preload="none"></audio>
+    <script src="script.js"></script>
+
+    <button id="clan-tag" class="clan-tag" type="button" aria-haspopup="true" aria-expanded="false" hidden></button>
+    
+</body>
+</html>
