@@ -569,9 +569,27 @@ function render(user) {
     tick();
 }
 
+// Visitors' device clocks are sometimes wrong (minutes or even hours). Everything on the
+// card is timed from Discord's song start time, so a wrong clock makes the lyrics jump to the
+// end. We read the real time from our own host's Date header once and correct for it.
+let clockSkew = 0;
+(async function syncClock() {
+    try {
+        const t0 = Date.now();
+        const res = await fetch(location.pathname, { method: "HEAD", cache: "no-store" });
+        const t1 = Date.now();
+        const header = res.headers.get("date");
+        const server = header ? new Date(header).getTime() : NaN;
+        if (!isNaN(server)) {
+            const skew = server - (t0 + t1) / 2;
+            clockSkew = Math.abs(skew) > 3000 ? skew : 0;   // ignore small differences
+        }
+    } catch (err) { /* keep the local clock */ }
+})();
+
 function tick() {
     if (!latest) return;
-    const now = Date.now();
+    const now = Date.now() + clockSkew;
 
     const t = latest.listening_to_spotify && latest.spotify && latest.spotify.timestamps;
     const fill = document.querySelector(".progress > span");
@@ -586,8 +604,10 @@ function tick() {
 
     if (t && lyricLines && lyricsBox) {
         const pos = (now - t.start) / 1000 + (CONFIG.lyricsOffset || 0);
+        // If the song is already over (paused, or Discord hasn't cleared it yet), don't jump to the last line.
+        const over = now > t.end + 4000;
         let idx = -1;
-        for (let i = 0; i < lyricLines.length && lyricLines[i].t <= pos; i++) idx = i;
+        if (!over) for (let i = 0; i < lyricLines.length && lyricLines[i].t <= pos; i++) idx = i;
         if (idx !== activeLyric) {
             if (activeLyric >= 0 && lyricLines[activeLyric]) lyricLines[activeLyric].node.classList.remove("active");
             activeLyric = idx;
