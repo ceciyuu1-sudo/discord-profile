@@ -280,6 +280,7 @@
 
         loading = false;
         if (error) {
+            console.error("[guestbook] could not load messages:", error.code, error.message);
             if (!wall.children.length) {
                 const box = h("div", "gb-empty");
                 box.append(h("p", "gb-empty-title", "Messages didn't load"), h("p", null, "Refresh the page to try again."));
