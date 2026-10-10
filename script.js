@@ -1207,3 +1207,60 @@ connect();
         })
         .catch(() => { box.hidden = true; });   // service down or blocked: just hide the badge
 })();
+
+// Like button: one like per browser (stored locally), total kept on the free Abacus counter.
+// Note: the public counter can only go up, so a like can't be taken back.
+(function likeButton() {
+    const NS = "vanitas-couldbeyuu-profile", KEY = "likes";
+    const btn = $("like-btn"), num = $("likes-count");
+    if (!btn || !num) return;
+
+    const base = `https://abacus.jasoncameron.dev`;
+    const store = {
+        get() { try { return localStorage.getItem("liked:" + NS) === "1"; } catch (e) { return false; } },
+        set() { try { localStorage.setItem("liked:" + NS, "1"); } catch (e) {} }
+    };
+    let liked = store.get(), count = 0;
+
+    const paint = () => {
+        num.textContent = count.toLocaleString();
+        btn.classList.toggle("liked", liked);
+        btn.setAttribute("aria-pressed", String(liked));
+        btn.title = liked ? "You liked this profile" : "Like this profile";
+    };
+
+    const burst = () => {
+        if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        for (let i = 0; i < 7; i++) {
+            const h = el("span", "heart-pop", "♥");
+            h.style.setProperty("--dx", `${Math.round((Math.random() - 0.5) * 70)}px`);
+            h.style.setProperty("--dy", `${-30 - Math.round(Math.random() * 40)}px`);
+            h.style.setProperty("--d", `${Math.round(Math.random() * 120)}ms`);
+            btn.append(h);
+            setTimeout(() => h.remove(), 1000);
+        }
+    };
+
+    fetch(`${base}/get/${NS}/${KEY}`)
+        .then((r) => r.status === 404 ? { value: 0 } : r.json())
+        .then((d) => {
+            if (typeof d.value !== "number") throw new Error("no value");
+            count = d.value;
+            paint();
+            btn.hidden = false;
+        })
+        .catch(() => { btn.hidden = true; });
+
+    btn.addEventListener("click", () => {
+        if (liked) return;
+        liked = true;
+        count += 1;                       // show it instantly, then confirm with the server
+        store.set();
+        paint();
+        burst();
+        fetch(`${base}/hit/${NS}/${KEY}`)
+            .then((r) => r.json())
+            .then((d) => { if (typeof d.value === "number") { count = d.value; paint(); } })
+            .catch(() => {});
+    });
+})();
