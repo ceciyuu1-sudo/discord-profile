@@ -9,8 +9,8 @@
     "use strict";
 
     const GB = {
-    url: "https://glopomvarxkhqbxzmbun.supabase.co",
-    anonKey: "sb_publishable_oGkcVnVXbuPkE_YIxJ_tug_FN5q2-Brsb_publishable_oGkcVnVXbuPkE_YIxJ_tug_FN5q2-Br",
+        url: "https://glopomvarxkhqbxzmbun.supabase.co",
+        anonKey: "sb_publishable_oGkcVnVXbuPkE_YIxJ_tug_FN5q2-Br",
         pageSize: 12,
         maxLength: 200
     };
@@ -18,6 +18,27 @@
     const root = document.getElementById("guestbook");
     if (!root) return;
     if (!window.supabase || /YOUR-/.test(GB.url + GB.anonKey)) { root.hidden = true; return; }
+
+    // Clean up copy/paste mistakes and explain bad keys in the console.
+    GB.url = GB.url.trim().replace(/\/+$/, "").replace(/\/(rest|auth)\/v1.*$/, "");
+    GB.anonKey = GB.anonKey.trim().replace(/^["'\u201C\u201D]+|["'\u201C\u201D]+$/g, "");
+    (function checkKey() {
+        const k = GB.anonKey;
+        let problem = "";
+        if (k.startsWith("sb_secret_")) problem = "this is a SECRET key. Use the publishable key (sb_publishable_...) instead, and roll the secret key in Supabase.";
+        else if (k.startsWith("eyJ")) {
+            try {
+                const role = JSON.parse(atob(k.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).role;
+                if (role !== "anon") problem = `this JWT key has role "${role}". Use the key whose role is "anon".`;
+            } catch (e) { problem = "this key looks cut off or garbled. Copy it again in full."; }
+        } else if (!k.startsWith("sb_publishable_")) {
+            problem = "this doesn't look like a Supabase key. It should start with sb_publishable_ or eyJ.";
+        }
+        if (!/^https:\/\/[a-z0-9]+\.supabase\.co$/.test(GB.url)) {
+            problem = problem || "the project URL should look like https://xxxxxxxx.supabase.co";
+        }
+        if (problem) console.error("[guestbook] key check:", problem, `(key starts with "${k.slice(0, 12)}", length ${k.length})`);
+    })();
 
     const sb = window.supabase.createClient(GB.url, GB.anonKey, {
         auth: { flowType: "pkce", persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
