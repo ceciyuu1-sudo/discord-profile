@@ -1484,23 +1484,41 @@ body {
 .media-ph svg .f { fill: currentColor; stroke: none; }
 
 /* =========================================
-   FIX: top accent lines on the cards were being clipped
-   by overflow:hidden on .card — the game card's line
-   (and the glow around every line) never showed up.
-   The blurred album backdrop on the Spotify card was
-   the only reason it looked like it had a glow.
-   ========================================= */
-.card { overflow: visible; }
+   FIX: red accent line on the game panel.
 
-.spotify-card::after {
-    /* the blurred art used to be hidden by overflow:hidden on .card;
-       clip-path does the same job without clipping the accent line */
-    clip-path: inset(40px round 12px);
+   The ::before approach kept being clipped or covered in the cascade,
+   so the line is drawn directly into the card's own background layers
+   (a background gradient cannot be clipped, hidden, or painted over
+   by any child element). A soft red glow is added above the card via
+   box-shadow.
+   ========================================= */
+
+.game-card {
+    background:
+        /* the red accent line itself, pinned to the top of the card */
+        linear-gradient(
+            90deg,
+            transparent 0%,
+            #ff3355 18%,
+            #ff3355 82%,
+            transparent 100%
+        ) top left / 100% 3px no-repeat,
+        /* keep the original soft red tint in the top-left corner */
+        radial-gradient(120% 90% at 0% 0%,
+            color-mix(in srgb, var(--accent) 14%, transparent),
+            transparent 55%),
+        /* keep the subtle inner sheen from the redesign */
+        linear-gradient(180deg, rgba(255, 255, 255, .025), transparent 40%),
+        var(--panel);
+    border-top-color: rgba(255, 51, 85, 0.55);
+    box-shadow:
+        0 -2px 22px -2px rgba(255, 51, 85, 0.60),
+        0 -1px 10px  0    rgba(255, 51, 85, 0.45);
 }
 
-/* Make the game card's accent line a touch more present so it reads
-   at the same intensity as the Spotify one. */
-.game-card::before {
-    background: linear-gradient(90deg, transparent, var(--accent) 12%, var(--accent) 88%, transparent);
-    box-shadow: 0 0 18px var(--accent), 0 0 4px var(--accent);
+/* Keep the same red glow on hover, just a bit stronger */
+.game-card:hover {
+    box-shadow:
+        0 -4px 30px -2px rgba(255, 51, 85, 0.75),
+        0 -1px 14px  0    rgba(255, 51, 85, 0.55);
 }
