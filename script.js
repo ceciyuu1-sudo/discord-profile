@@ -592,6 +592,8 @@ function tick() {
     const now = Date.now() + clockSkew;
 
     const t = latest.listening_to_spotify && latest.spotify && latest.spotify.timestamps;
+    // Song already finished (or paused) but Discord still lists it: show it as "Last played".
+    const over = !!t && now > t.end + 4000;
     const fill = document.querySelector(".progress > span");
     if (t && fill) {
         const total = t.end - t.start;
@@ -602,10 +604,16 @@ function tick() {
         spans[1].textContent = fmt(total);
     }
 
+    const npTag = document.querySelector(".np-tag");
+    if (npTag && t) {
+        const label = npTag.querySelector("span:not(.eq)");
+        if (label) label.textContent = over ? "Last played" : "Now playing";
+        npTag.querySelectorAll(".eq i").forEach((bar) => { bar.style.animationPlayState = over ? "paused" : "running"; });
+    }
+
     if (t && lyricLines && lyricsBox) {
         const pos = (now - t.start) / 1000 + (CONFIG.lyricsOffset || 0);
-        // If the song is already over (paused, or Discord hasn't cleared it yet), don't jump to the last line.
-        const over = now > t.end + 4000;
+        // If the song is over, don't jump to the last line.
         let idx = -1;
         if (!over) for (let i = 0; i < lyricLines.length && lyricLines[i].t <= pos; i++) idx = i;
         if (idx !== activeLyric) {
