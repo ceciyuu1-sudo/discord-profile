@@ -571,31 +571,36 @@ function render(user) {
 
 /* =====================================================================
    CLOCK SYNC
-   Discord reports when a song started using Discord's own clock, but every
-   visitor compares it against their own device clock, and phones are often
-   a minute or more off. That made the elapsed-time slider and the lyrics
-   sync drift on those devices.
+   Reads a real time from a JSON API (millisecond precision) and applies
+   the difference to every Date.now() call. Falls back to the Date header
+   our host returns, then to a value we cached on a previous visit.
 
-   Fix: read a real time from a JSON API (millisecond precision) and apply
-   the difference wherever we use Date.now(). Falls back to the Date header
-   our host returns, then to a value we cached on a previous visit. Re-syncs
-   every 5 minutes and whenever the tab becomes visible again.
-
-   Add ?debug to the page URL to see the numbers on screen.
+   IMPORTANT: timeapi.io returns its `dateTime` field WITHOUT a timezone
+   suffix (e.g. "2026-04-22T14:30:15.89"), so Date.parse() would treat it
+   as local time. For anyone east/west of UTC that produced a skew off by
+   their whole offset, which then broke the progress bar and the lyrics.
+   We build the timestamp from the numeric fields with Date.UTC() instead,
+   which is unambiguous.
    ===================================================================== */
+const CLOCK_CACHE_KEY = "clock:skew:v2";   // v2: discard the broken v1 value
 let rawSkew = 0;      // real time minus this device's clock, in ms
 let clockSkew = 0;    // value we add to Date.now() everywhere
 
 // Reuse a previously measured skew so the very first second isn't wrong.
 try {
-    const c = JSON.parse(localStorage.getItem("clock:skew") || "null");
+    const c = JSON.parse(localStorage.getItem(CLOCK_CACHE_KEY) || "null");
     if (c && typeof c.skew === "number" && Date.now() - c.at < 6 * 60 * 60 * 1000) {
-        rawSkew = clockSkew = Math.round(c.skew);
+        // Reject obvious garbage before trusting the cache.
+        if (Math.abs(c.skew) < 24 * 3600 * 1000) {
+            rawSkew = clockSkew = Math.round(c.skew);
+        } else {
+            localStorage.removeItem(CLOCK_CACHE_KEY);
+        }
     }
 } catch (e) {}
 
 async function sampleSkew() {
-    // 1) timeapi.io — JSON, millisecond precision, CORS-enabled
+    // 1) timeapi.io — JSON, millisecond precision, CORS-enabled.
     {
         const t0 = Date.now();
         try {
@@ -604,10 +609,27 @@ async function sampleSkew() {
             const t1 = Date.now();
             if (res.ok) {
                 const d = await res.json();
-                const ms = Date.parse(d.dateTime || d.dateTimeUtc || "");
+                let ms = NaN;
+                // Build from numeric fields as UTC — safe regardless of local timezone.
+                if (d && typeof d.year === "number" && typeof d.month === "number" && typeof d.day === "number") {
+                    ms = Date.UTC(
+                        d.year,
+                        d.month - 1,
+                        d.day,
+                        d.hour || 0,
+                        d.minute || 0,
+                        d.seconds || 0,
+                        d.milliSeconds || 0
+                    );
+                } else {
+                    // Fallback: parse the string, forcing a UTC interpretation if no zone is present.
+                    let iso = d.dateTimeUtc || d.dateTime || "";
+                    if (iso && !/[Zz]|[+-]\d\d:?\d\d$/.test(iso)) iso += "Z";
+                    ms = Date.parse(iso);
+                }
                 if (Number.isFinite(ms)) {
-                    // API time is when the server assembled the response.
-                    // Response was generated at ~(t0+t1)/2 on our clock.
+                    // ms is the server's clock when it generated the response.
+                    // The client's clock at that moment is about (t0+t1)/2.
                     return { skew: ms - (t0 + t1) / 2, rtt: t1 - t0, source: "timeapi.io" };
                 }
             }
@@ -645,13 +667,13 @@ async function syncClock() {
     }
     samples.sort((a, b) => a.rtt - b.rtt);
     const best = samples[0];
-    if (Math.abs(best.skew) > 3600_000) {   // >1 h: obviously a bad sample
+    if (Math.abs(best.skew) > 24 * 3600 * 1000) {   // >24 h: obviously a bad sample
         console.warn("[clock] rejecting absurd skew:", best);
         return;
     }
     rawSkew = clockSkew = Math.round(best.skew);
     try {
-        localStorage.setItem("clock:skew", JSON.stringify({ skew: rawSkew, at: Date.now() }));
+        localStorage.setItem(CLOCK_CACHE_KEY, JSON.stringify({ skew: rawSkew, at: Date.now() }));
     } catch (e) {}
     console.info(`[clock] skew ${rawSkew >= 0 ? "+" : ""}${rawSkew}ms via ${best.source} (rtt ${best.rtt}ms)`);
 }
