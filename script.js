@@ -569,27 +569,9 @@ function render(user) {
     tick();
 }
 
-// Visitors' device clocks are sometimes wrong (minutes or even hours). Everything on the
-// card is timed from Discord's song start time, so a wrong clock makes the lyrics jump to the
-// end. We read the real time from our own host's Date header once and correct for it.
-let clockSkew = 0;
-(async function syncClock() {
-    try {
-        const t0 = Date.now();
-        const res = await fetch(location.pathname, { method: "HEAD", cache: "no-store" });
-        const t1 = Date.now();
-        const header = res.headers.get("date");
-        const server = header ? new Date(header).getTime() : NaN;
-        if (!isNaN(server)) {
-            const skew = server - (t0 + t1) / 2;
-            clockSkew = Math.abs(skew) > 3000 ? skew : 0;   // ignore small differences
-        }
-    } catch (err) { /* keep the local clock */ }
-})();
-
 function tick() {
     if (!latest) return;
-    const now = Date.now() + clockSkew;
+    const now = Date.now();
 
     const t = latest.listening_to_spotify && latest.spotify && latest.spotify.timestamps;
     // Song already finished (or paused) but Discord still lists it: show it as "Last played".
