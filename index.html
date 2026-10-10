@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Space+Grotesk:wght@500;700&family=Newsreader:ital,wght@1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="guestbook.css">
 </head>
 <body data-status="offline">
 
@@ -219,6 +220,17 @@
             <div class="grid" id="fav-games"></div>
         </section>
 
+        <!-- ================= GUESTBOOK ================= -->
+        <section class="fav guestbook" id="guestbook" aria-labelledby="h-gb">
+            <header class="gb-head">
+                <h3 class="eyebrow" id="h-gb">Guestbook</h3>
+                <p class="gb-lead">Leave a line on the wall. Messages go live once I've read them.</p>
+            </header>
+            <div class="gb-compose" id="gb-compose"></div>
+            <div class="gb-wall" id="gb-wall" aria-live="polite"></div>
+            <button class="gb-more" id="gb-more" type="button" hidden>Show older messages</button>
+        </section>
+
         <blockquote class="about-quote">
             <p>“True love begins when nothing is looked for in return.”</p>
             <cite>— Antoine de Saint-Exupéry</cite>
@@ -249,6 +261,8 @@
 
     <audio id="bgm" loop preload="auto"></audio>
     <script src="script.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+    <script src="guestbook.js"></script>
 
     <button id="clan-tag" class="clan-tag" type="button" aria-haspopup="true" aria-expanded="false" hidden></button>
     
