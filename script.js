@@ -576,63 +576,88 @@ function render(user) {
    a minute or more off. That made the elapsed-time slider and the lyrics
    sync drift on those devices.
 
-   Fix: read the real time from the Date header our own host returns and
-   apply the difference wherever we use Date.now(). Three details matter:
-   - HTTP dates only have 1-second resolution, so the true server time is
-     somewhere in [header, header + 1000). We add 500 ms to land on the
-     midpoint.
-   - Network latency makes a reading later, never earlier, so a slow sample
-     is worse than a fast one. We take three samples and keep the one with
-     the smallest RTT.
-   - We re-sync every few minutes (and when the tab wakes up) so devices
-     whose clock drifts, or gets NTP-corrected mid-session, still end up
-     right.
-   - If every request fails we keep the last good skew (0 on the very first
-     try).
+   Fix: read a real time from a JSON API (millisecond precision) and apply
+   the difference wherever we use Date.now(). Falls back to the Date header
+   our host returns, then to a value we cached on a previous visit. Re-syncs
+   every 5 minutes and whenever the tab becomes visible again.
+
    Add ?debug to the page URL to see the numbers on screen.
    ===================================================================== */
 let rawSkew = 0;      // real time minus this device's clock, in ms
 let clockSkew = 0;    // value we add to Date.now() everywhere
 
+// Reuse a previously measured skew so the very first second isn't wrong.
+try {
+    const c = JSON.parse(localStorage.getItem("clock:skew") || "null");
+    if (c && typeof c.skew === "number" && Date.now() - c.at < 6 * 60 * 60 * 1000) {
+        rawSkew = clockSkew = Math.round(c.skew);
+    }
+} catch (e) {}
+
 async function sampleSkew() {
-    const t0 = Date.now();
-    let res;
-    try {
-        // cache-bust so the Date header is fresh on every sample
-        res = await fetch(location.pathname + "?__clock=" + t0, {
-            method: "HEAD",
-            cache: "no-store",
-        });
-    } catch (e) { return null; }
-    const t1 = Date.now();
-    const header = res.headers.get("date");
-    if (!header) return null;
-    const server = new Date(header).getTime();
-    if (!Number.isFinite(server)) return null;
-    // True server time at response: [server, server + 1000). Use the midpoint.
-    const skew = (server + 500) - (t0 + t1) / 2;
-    return { skew, rtt: t1 - t0 };
+    // 1) timeapi.io — JSON, millisecond precision, CORS-enabled
+    {
+        const t0 = Date.now();
+        try {
+            const res = await fetch("https://timeapi.io/api/Time/current/zone?timeZone=UTC",
+                                    { cache: "no-store" });
+            const t1 = Date.now();
+            if (res.ok) {
+                const d = await res.json();
+                const ms = Date.parse(d.dateTime || d.dateTimeUtc || "");
+                if (Number.isFinite(ms)) {
+                    // API time is when the server assembled the response.
+                    // Response was generated at ~(t0+t1)/2 on our clock.
+                    return { skew: ms - (t0 + t1) / 2, rtt: t1 - t0, source: "timeapi.io" };
+                }
+            }
+        } catch (e) {}
+    }
+    // 2) Fallback: our own host's Date header (1-second resolution).
+    {
+        const t0 = Date.now();
+        try {
+            const res = await fetch(location.pathname + "?__t=" + t0,
+                                    { method: "HEAD", cache: "no-store" });
+            const t1 = Date.now();
+            const h = res.headers.get("date");
+            if (h) {
+                const ms = new Date(h).getTime();
+                if (Number.isFinite(ms)) {
+                    return { skew: (ms + 500) - (t0 + t1) / 2, rtt: t1 - t0, source: "date-header" };
+                }
+            }
+        } catch (e) {}
+    }
+    return null;
 }
 
 async function syncClock() {
     const samples = [];
     for (let i = 0; i < 3; i++) {
-        if (i) await new Promise((r) => setTimeout(r, 180));
+        if (i) await new Promise((r) => setTimeout(r, 200));
         const s = await sampleSkew();
         if (s) samples.push(s);
     }
-    if (!samples.length) return;                    // keep last good value
-    samples.sort((a, b) => a.rtt - b.rtt);          // fastest RTT = best sample
-    rawSkew = Math.round(samples[0].skew);
-    clockSkew = rawSkew;                            // no threshold anymore
-    console.info(
-        "[clock] skew " + (rawSkew >= 0 ? "+" : "") + rawSkew +
-        " ms (best rtt " + samples[0].rtt + " ms)"
-    );
+    if (!samples.length) {
+        console.warn("[clock] all samples failed; keeping skew = " + clockSkew + "ms");
+        return;
+    }
+    samples.sort((a, b) => a.rtt - b.rtt);
+    const best = samples[0];
+    if (Math.abs(best.skew) > 3600_000) {   // >1 h: obviously a bad sample
+        console.warn("[clock] rejecting absurd skew:", best);
+        return;
+    }
+    rawSkew = clockSkew = Math.round(best.skew);
+    try {
+        localStorage.setItem("clock:skew", JSON.stringify({ skew: rawSkew, at: Date.now() }));
+    } catch (e) {}
+    console.info(`[clock] skew ${rawSkew >= 0 ? "+" : ""}${rawSkew}ms via ${best.source} (rtt ${best.rtt}ms)`);
 }
 
 syncClock();
-setInterval(syncClock, 3 * 60 * 1000);
+setInterval(syncClock, 5 * 60 * 1000);
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") syncClock();
 });
@@ -924,6 +949,17 @@ CONFIG.links.forEach(({ label, href }) => {
 
 fetchOnce();
 connect();
+
+// Mobile browsers suspend WebSockets when the tab is backgrounded or the
+// screen locks. When the tab wakes, force a REST fetch right away so the
+// panel doesn't sit on stale data.
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") fetchOnce();
+});
+window.addEventListener("focus", fetchOnce);
+
+// Safety net: a REST poll every 30 seconds in case the socket has silently died.
+setInterval(fetchOnce, 30 * 1000);
 
 
 // Banner
