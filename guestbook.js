@@ -9,8 +9,8 @@
     "use strict";
 
     const GB = {
-        url: "https://YOUR-PROJECT.supabase.co",
-        anonKey: "YOUR-ANON-KEY",
+    url: "https://glopomvarxkhqbxzmbun.supabase.co",
+    anonKey: "paste-your-anon-key-here",
         pageSize: 12,
         maxLength: 200
     };
