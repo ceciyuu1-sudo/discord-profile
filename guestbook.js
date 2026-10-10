@@ -10,7 +10,7 @@
 
     const GB = {
     url: "https://glopomvarxkhqbxzmbun.supabase.co",
-    anonKey: "paste-your-anon-key-here",
+    anonKey: "sb_publishable_oGkcVnVXbuPkE_YIxJ_tug_FN5q2-Br",
         pageSize: 12,
         maxLength: 200
     };
