@@ -109,6 +109,32 @@ function activityImage(a) {
     return `https://cdn.discordapp.com/app-assets/${a.application_id}/${img}.png`;
 }
 
+// Connection pill in the footer (replaces the old "Live from Discord" text).
+function setConn(state, label, tip) {
+    const root = $("footnote");
+    const pill = root && root.querySelector(".credit-live");
+    if (!pill) return;
+    pill.dataset.state = state;
+    pill.title = tip || label;
+    pill.querySelector(".credit-live-text").textContent = label;
+}
+
+// Empty-state block for the panels (static icon markup only, no remote data).
+const EMPTY_ICONS = {
+    music: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" opacity=".35"/><path d="M12 3a9 9 0 018.5 6"/><circle cx="12" cy="12" r="2.2"/></svg>',
+    game:  '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="4"/><path d="M6 12h4M8 10v4"/><circle class="f" cx="15.5" cy="11" r="1"/><circle class="f" cx="18" cy="13.2" r="1"/></svg>'
+};
+function emptyState(kind, title, sub) {
+    const wrap = el("div", "empty");
+    const ico = el("span", "empty-ico");
+    ico.setAttribute("aria-hidden", "true");
+    ico.innerHTML = EMPTY_ICONS[kind];
+    const txt = el("div");
+    txt.append(el("p", "empty-title", title), el("p", "sub-text", sub));
+    wrap.append(ico, txt);
+    return wrap;
+}
+
 let latest = null;
 let shownTrack;
 let embedOpen = false;
@@ -415,7 +441,17 @@ function render(user) {
         sp.replaceChildren();
         if (trackId) {
             const t = user.spotify;
-            sp.append(mediaRow(t.album_art_url, t.song, `by ${t.artist.replaceAll(";", ",")}`));
+            const row = mediaRow(t.album_art_url, t.song, `by ${t.artist.replaceAll(";", ",")}`);
+            const npTag = el("div", "np-tag");
+            const eq = el("span", "eq");
+            eq.append(el("i"), el("i"), el("i"));
+            npTag.append(eq, el("span", null, "Now playing"));
+            row.querySelector(".text").prepend(npTag);
+            sp.append(row);
+            // blurred album art behind the card (only for plain https image URLs)
+            const spCard = document.querySelector(".spotify-card");
+            if (/^https:\/\/[\w.\-\/]+$/.test(t.album_art_url || "")) spCard.style.setProperty("--art", `url("${t.album_art_url}")`);
+            else spCard.style.removeProperty("--art");
             const prog = el("div", "progress");
             prog.append(el("span"));
             const times = el("div", "times");
@@ -477,7 +513,7 @@ function render(user) {
             mount();
             mountLyrics();
         } else {
-            sp.append(el("p", null, "Nothing playing"), el("p", "sub-text", "Start Spotify and your track shows up here live."));
+            sp.append(emptyState("music", "Nothing playing", "Start Spotify and your track shows up here live."));
         }
     }
 
@@ -506,6 +542,11 @@ function render(user) {
                 img.src = info.icon;
                 img.alt = "";
                 row.prepend(img);
+            } else {
+                const ph = el("span", "media-ph");
+                ph.setAttribute("aria-hidden", "true");
+                ph.innerHTML = EMPTY_ICONS.game;
+                row.prepend(ph);
             }
             if (app) return;
             const store = storeLink(game.name, info.steamId);
@@ -520,11 +561,11 @@ function render(user) {
         $("game-title").textContent = app ? "Working in" : "Play with me";
     } else {
         $("game-title").textContent = "Play with me";
-        gc.append(el("p", null, "No game right now"), el("p", "sub-text", "Whatever is being played appears here automatically."));
+        gc.append(emptyState("game", "No game right now", "Whatever is being played appears here automatically."));
         bar.append(el("p", null, "🎮 No active game detected"));
     }
 
-    $("footnote").textContent = "Live from Discord";
+    setConn("live", "live", "Live from Discord");
     tick();
 }
 
@@ -569,9 +610,9 @@ async function fetchOnce() {
         const res = await fetch(REST_URL);
         const json = await res.json();
         if (json.success) render(json.data);
-        else $("footnote").textContent = "Join the Lanyard Discord server to enable live presence.";
+        else setConn("error", "no presence", "Join the Lanyard Discord server to enable live presence.");
     } catch (err) {
-        $("footnote").textContent = "Offline — could not reach Lanyard.";
+        setConn("error", "offline", "Could not reach Lanyard.");
         console.error("Lanyard fetch failed:", err);
     }
 }
@@ -1330,4 +1371,17 @@ connect();
     });
 
     box.title = "Drag to move · double-click to reset";
+})();
+
+
+// Footer credit: types itself out once when it scrolls into view.
+(function credit() {
+    const root = $("footnote");
+    if (!root || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    root.classList.add("armed");
+    if (!("IntersectionObserver" in window)) { root.classList.add("in"); return; }
+    const io = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) { root.classList.add("in"); io.disconnect(); }
+    }, { threshold: 0.6 });
+    io.observe(root);
 })();

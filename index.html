@@ -142,23 +142,47 @@
 
         <div class="activity-grid">
             <section class="card spotify-card" aria-labelledby="spotify-title">
-                <h3 id="spotify-title">Listen with me</h3>
+                <header class="card-head">
+                    <span class="card-ico" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14v-2a9 9 0 0118 0v2"/><path d="M3 14h3a1 1 0 011 1v4a1 1 0 01-1 1H5a2 2 0 01-2-2v-4zM21 14h-3a1 1 0 00-1 1v4a1 1 0 001 1h1a2 2 0 002-2v-4z"/></svg></span>
+                    <h3 id="spotify-title">Listen with me</h3>
+                    <span class="live-badge"><i></i>Live</span>
+                </header>
                 <div id="spotify-content" class="card-content" aria-live="polite">
-                    <p>Nothing playing</p>
-                    <p class="sub-text">Start Spotify and your track shows up here live.</p>
+                    <div class="empty">
+                        <span class="empty-ico" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" opacity=".35"/><path d="M12 3a9 9 0 018.5 6"/><circle cx="12" cy="12" r="2.2"/></svg></span>
+                        <div>
+                            <p class="empty-title">Nothing playing</p>
+                            <p class="sub-text">Start Spotify and your track shows up here live.</p>
+                        </div>
+                    </div>
                 </div>
             </section>
 
             <section class="card game-card" aria-labelledby="game-title">
-                <h3 id="game-title">Play with me</h3>
+                <header class="card-head">
+                    <span class="card-ico" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="4"/><path d="M6 12h4M8 10v4"/><circle class="f" cx="15.5" cy="11" r="1"/><circle class="f" cx="18" cy="13.2" r="1"/></svg></span>
+                    <h3 id="game-title">Play with me</h3>
+                    <span class="live-badge"><i></i>Live</span>
+                </header>
                 <div id="game-content" class="card-content" aria-live="polite">
-                    <p>No game right now</p>
-                    <p class="sub-text">Whatever is being played appears here automatically.</p>
+                    <div class="empty">
+                        <span class="empty-ico" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="4"/><path d="M6 12h4M8 10v4"/><circle class="f" cx="15.5" cy="11" r="1"/><circle class="f" cx="18" cy="13.2" r="1"/></svg></span>
+                        <div>
+                            <p class="empty-title">No game right now</p>
+                            <p class="sub-text">Whatever is being played appears here automatically.</p>
+                        </div>
+                    </div>
                 </div>
             </section>
         </div>
 
-        <p class="footnote" id="footnote">Connecting…</p>
+        <footer class="credit" id="footnote" aria-label="Coded and designed by Vanitas">
+            <p class="credit-text">
+                <span class="credit-brace" aria-hidden="true">&lt;/&gt;</span>
+                <span class="type type-a">coded &amp; designed by&nbsp;</span><span class="type type-b credit-name">Vanitas</span><span class="credit-caret" aria-hidden="true"></span><span class="credit-mark" aria-hidden="true">✤</span>
+            </p>
+            <span class="credit-live" data-state="connecting" title="Connecting…"><i></i><span class="credit-live-text">connecting</span></span>
+        </footer>
     </main>
 
     <a href="#about" class="scroll-cue" id="scroll-cue" aria-label="Scroll to About me">
