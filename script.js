@@ -1185,3 +1185,25 @@ connect();
         });
     }
 })();
+// Visitor counter: counts each browser once, then just shows the total.
+// Uses the free Abacus API (no account). Change COUNTER_NS if you ever want to start from zero.
+(function visitCounter() {
+    const COUNTER_NS = "vanitas-couldbeyuu-profile";
+    const COUNTER_KEY = "visits";
+    const box = $("visits"), num = $("visits-count");
+    if (!box || !num) return;
+
+    let counted = false;
+    try { counted = localStorage.getItem("visited:" + COUNTER_NS) === "1"; } catch (e) {}
+
+    const url = `https://abacus.jasoncameron.dev/${counted ? "get" : "hit"}/${COUNTER_NS}/${COUNTER_KEY}`;
+    fetch(url)
+        .then((r) => r.json())
+        .then((d) => {
+            if (typeof d.value !== "number") throw new Error("no value");
+            num.textContent = d.value.toLocaleString();
+            box.hidden = false;
+            if (!counted) { try { localStorage.setItem("visited:" + COUNTER_NS, "1"); } catch (e) {} }
+        })
+        .catch(() => { box.hidden = true; });   // service down or blocked: just hide the badge
+})();

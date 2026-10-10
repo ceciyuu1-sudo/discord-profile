@@ -1061,3 +1061,16 @@ body {
 .enter-text { font-family: 'Space Grotesk', sans-serif; font-size: 1.6rem; font-weight: 700; letter-spacing: .08em; }
 .enter-sub { font-size: .7rem; letter-spacing: .28em; text-transform: uppercase; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .enter-note { animation: none; } }
+
+/* Visitor counter */
+.visits {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: .8rem;
+    color: var(--muted);
+}
+.visits[hidden] { display: none; }
+.visits svg { width: 15px; height: 15px; fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.visits #visits-count { color: var(--text); font-weight: 700; }
