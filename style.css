@@ -283,14 +283,10 @@ body {
     box-shadow: 0 0 25px rgba(30, 215, 96, 0.15);
 }
 
-/* Glow red when hovering the Game card (matches the Spotify card,
-   and keeps the top-line glow so the transition is smooth) */
+/* Glow red when hovering the Game card */
 .game-card:hover {
     border-color: var(--accent);
-    box-shadow:
-        0 0 25px color-mix(in srgb, var(--accent) 20%, transparent),
-        0 -2px 22px -2px rgba(255, 51, 85, 0.60),
-        0 -1px 10px  0    rgba(255, 51, 85, 0.45);
+    box-shadow: 0 0 25px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 .game-card.live { border-color: var(--accent); }
 
@@ -1488,34 +1484,116 @@ body {
 .media-ph svg .f { fill: currentColor; stroke: none; }
 
 /* =========================================
-   FIX: red accent line on the game panel.
-
-   The ::before approach kept being clipped or covered in the cascade,
-   so the line is drawn directly into the card's own background layers
-   (a background gradient cannot be clipped, hidden, or painted over
-   by any child element). A soft red glow is added above the card via
-   box-shadow.
+   CUSTOM CURSOR
+   A red dot sits exactly on the pointer; a ring eases behind it and
+   grows over anything clickable; a fainter ghost ring trails further
+   back. Skipped on touch devices and for reduced-motion users.
    ========================================= */
+@media (hover: hover) and (pointer: fine) {
 
-.game-card {
-    background:
-        /* the red accent line itself, pinned to the top of the card */
-        linear-gradient(
-            90deg,
-            transparent 0%,
-            #ff3355 18%,
-            #ff3355 82%,
-            transparent 100%
-        ) top left / 100% 3px no-repeat,
-        /* keep the original soft red tint in the top-left corner */
-        radial-gradient(120% 90% at 0% 0%,
-            color-mix(in srgb, var(--accent) 14%, transparent),
-            transparent 55%),
-        /* keep the subtle inner sheen from the redesign */
-        linear-gradient(180deg, rgba(255, 255, 255, .025), transparent 40%),
-        var(--panel);
-    border-top-color: rgba(255, 51, 85, 0.55);
-    box-shadow:
-        0 -2px 22px -2px rgba(255, 51, 85, 0.60),
-        0 -1px 10px  0    rgba(255, 51, 85, 0.45);
+    /* Hide the system cursor everywhere we can see it. */
+    html, body,
+    a, button, input, textarea, select, label,
+    [role="button"], [contenteditable="true"],
+    .pcard, .zoomable, .socials a, .btn, .like-btn,
+    .gb-post, .gb-signin, .gb-more, .gb-del, .gb-link,
+    .player, .pl-btn, .scroll-cue, .clan-tag, .lightbox-btn,
+    .lyrics-sync, .popover-btn, .media-ph {
+        cursor: none;
+    }
+
+    .cursor-dot,
+    .cursor-ring,
+    .cursor-ghost {
+        position: fixed;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+        z-index: 999999;
+        border-radius: 50%;
+        opacity: 0;
+        will-change: transform;
+        transition: opacity .3s ease;
+    }
+
+    /* ---- dot: sits exactly on the pointer ---- */
+    .cursor-dot {
+        width: 6px;
+        height: 6px;
+        margin: -3px 0 0 -3px;
+        background: var(--accent);
+        box-shadow:
+            0 0 8px var(--accent),
+            0 0 20px color-mix(in srgb, var(--accent) 55%, transparent);
+        transition:
+            opacity .3s ease,
+            scale .15s ease,
+            background-color .2s ease,
+            box-shadow .2s ease;
+    }
+
+    /* ---- ring: eases behind, expands over clickable things ---- */
+    .cursor-ring {
+        width: 34px;
+        height: 34px;
+        margin: -17px 0 0 -17px;
+        border: 1.5px solid color-mix(in srgb, var(--accent) 75%, transparent);
+        box-shadow:
+            0 0 14px color-mix(in srgb, var(--accent) 35%, transparent),
+            inset 0 0 10px color-mix(in srgb, var(--accent) 18%, transparent);
+        transition:
+            opacity .3s ease,
+            width .28s cubic-bezier(.2, .9, .3, 1.4),
+            height .28s cubic-bezier(.2, .9, .3, 1.4),
+            margin .28s cubic-bezier(.2, .9, .3, 1.4),
+            background-color .25s ease,
+            border-color .25s ease,
+            box-shadow .25s ease;
+    }
+
+    /* ---- ghost: very faint trailing ring, furthest behind ---- */
+    .cursor-ghost {
+        width: 22px;
+        height: 22px;
+        margin: -11px 0 0 -11px;
+        border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+    }
+
+    /* ---- reveal once the pointer has moved at least once ---- */
+    body.cursor-ready .cursor-dot   { opacity: 1; }
+    body.cursor-ready .cursor-ring  { opacity: 1; }
+    body.cursor-ready .cursor-ghost { opacity: .45; }
+
+    /* ---- hover state: ring grows and fills, dot shrinks and whitens ---- */
+    .cursor-ring.is-hover {
+        width: 60px;
+        height: 60px;
+        margin: -30px 0 0 -30px;
+        background: color-mix(in srgb, var(--accent) 12%, transparent);
+        border-color: var(--accent);
+        box-shadow:
+            0 0 28px color-mix(in srgb, var(--accent) 55%, transparent),
+            inset 0 0 18px color-mix(in srgb, var(--accent) 28%, transparent);
+    }
+    .cursor-dot.is-hover {
+        scale: .65;
+        background: #fff;
+        box-shadow:
+            0 0 10px var(--accent),
+            0 0 24px var(--accent);
+    }
+
+    /* ---- pressed state: everything shrinks briefly ---- */
+    .cursor-ring.is-down {
+        width: 24px;
+        height: 24px;
+        margin: -12px 0 0 -12px;
+        background: color-mix(in srgb, var(--accent) 22%, transparent);
+    }
+    .cursor-dot.is-down  { scale: .45; }
+    .cursor-ghost.is-down { opacity: 0; }
+
+    @media (prefers-reduced-motion: reduce) {
+        .cursor-dot, .cursor-ring, .cursor-ghost { transition: opacity .2s ease; }
+    }
 }

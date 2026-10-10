@@ -1526,3 +1526,108 @@ setInterval(fetchOnce, 30 * 1000);
     }, { threshold: 0.6 });
     io.observe(root);
 })();
+
+/* =========================================
+   CUSTOM CURSOR
+   Three layers: a dot that sits exactly on the pointer, a ring that
+   eases behind it, and a fainter ghost ring trailing further back.
+   The ring grows and pulls gently toward clickable elements.
+   Skipped on touch devices and for reduced-motion users.
+   ========================================= */
+(function customCursor() {
+    if (!matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const dot   = document.createElement("div");
+    const ring  = document.createElement("div");
+    const ghost = document.createElement("div");
+    dot.className   = "cursor-dot";
+    ring.className  = "cursor-ring";
+    ghost.className = "cursor-ghost";
+    document.body.append(ghost, ring, dot);
+
+    let mx = -200, my = -200;      // pointer target
+    let rx = -200, ry = -200;      // ring  (eases behind)
+    let gx = -200, gy = -200;      // ghost (eases further behind)
+    let ready = false;
+
+    // Magnetic pull — when the pointer is inside a clickable element, the
+    // ring is nudged toward the element's centre (capped at 10px).
+    let pullX = 0, pullY = 0, targetEl = null;
+    const recomputePull = () => {
+        if (!targetEl) { pullX = 0; pullY = 0; return; }
+        const r = targetEl.getBoundingClientRect();
+        const cx = r.left + r.width  / 2;
+        const cy = r.top  + r.height / 2;
+        pullX = Math.max(-10, Math.min(10, (cx - mx) * 0.25));
+        pullY = Math.max(-10, Math.min(10, (cy - my) * 0.25));
+    };
+
+    window.addEventListener("pointermove", (e) => {
+        if (e.pointerType === "touch") return;
+        mx = e.clientX;
+        my = e.clientY;
+        if (!ready) {
+            ready = true;
+            rx = mx; ry = my;
+            gx = mx; gy = my;
+            document.body.classList.add("cursor-ready");
+        }
+        recomputePull();
+    }, { passive: true });
+
+    // Animation loop
+    (function loop() {
+        rx += (mx + pullX - rx) * 0.22;
+        ry += (my + pullY - ry) * 0.22;
+        gx += (mx - gx) * 0.10;
+        gy += (my - gy) * 0.10;
+        dot.style.transform   = `translate3d(${mx}px, ${my}px, 0)`;
+        ring.style.transform  = `translate3d(${rx}px, ${ry}px, 0)`;
+        ghost.style.transform = `translate3d(${gx}px, ${gy}px, 0)`;
+        requestAnimationFrame(loop);
+    })();
+
+    // Hover state — track which element the pointer is over.
+    const INTERACTIVE = 'a, button, input, textarea, select, label, [role="button"], ' +
+        '[contenteditable="true"], .pcard, .zoomable, .btn, .like-btn, .gb-post, ' +
+        '.gb-signin, .gb-more, .gb-del, .gb-link, .player, .pl-btn, .scroll-cue, ' +
+        '.clan-tag, .lightbox-btn, .lyrics-sync, .popover-btn, .socials a';
+
+    document.addEventListener("pointerover", (e) => {
+        if (e.pointerType === "touch") return;
+        const t = e.target;
+        if (!t || t.nodeType !== 1) return;
+        const hit = t.closest(INTERACTIVE);
+        if (hit) {
+            targetEl = hit;
+            ring.classList.add("is-hover");
+            dot.classList.add("is-hover");
+            recomputePull();
+        } else {
+            targetEl = null;
+            ring.classList.remove("is-hover");
+            dot.classList.remove("is-hover");
+            pullX = 0; pullY = 0;
+        }
+    }, { passive: true });
+
+    // Pressed state
+    window.addEventListener("pointerdown", () => {
+        dot.classList.add("is-down");
+        ring.classList.add("is-down");
+        ghost.classList.add("is-down");
+    });
+    const release = () => {
+        dot.classList.remove("is-down");
+        ring.classList.remove("is-down");
+        ghost.classList.remove("is-down");
+    };
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+    window.addEventListener("blur", release);
+
+    // Hide when the pointer leaves the window
+    document.addEventListener("mouseleave", () => document.body.classList.remove("cursor-ready"));
+    document.addEventListener("mouseenter", () => { if (ready) document.body.classList.add("cursor-ready"); });
+})();
