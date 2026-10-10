@@ -211,10 +211,12 @@
             post.disabled = true; ta.readOnly = true;
             setStatus("Sending…");
 
-            const { data, error } = await sb.from("guestbook").insert({ message }).select().single();
+            const { data, error } = await sb.from("guestbook").insert({ message })
+                .select("id,user_id,name,avatar,message,pinned,approved,created_at").single();
 
             ta.readOnly = false;
             if (error) {
+                console.error("[guestbook] could not post:", error.code, error.message);
                 setStatus(errorText(error), "err");
                 paint();
                 return;
