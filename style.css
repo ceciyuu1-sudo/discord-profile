@@ -1482,3 +1482,25 @@ body {
 }
 .media-ph svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .media-ph svg .f { fill: currentColor; stroke: none; }
+
+/* =========================================
+   FIX: top accent lines on the cards were being clipped
+   by overflow:hidden on .card — the game card's line
+   (and the glow around every line) never showed up.
+   The blurred album backdrop on the Spotify card was
+   the only reason it looked like it had a glow.
+   ========================================= */
+.card { overflow: visible; }
+
+.spotify-card::after {
+    /* the blurred art used to be hidden by overflow:hidden on .card;
+       clip-path does the same job without clipping the accent line */
+    clip-path: inset(40px round 12px);
+}
+
+/* Make the game card's accent line a touch more present so it reads
+   at the same intensity as the Spotify one. */
+.game-card::before {
+    background: linear-gradient(90deg, transparent, var(--accent) 12%, var(--accent) 88%, transparent);
+    box-shadow: 0 0 18px var(--accent), 0 0 4px var(--accent);
+}
