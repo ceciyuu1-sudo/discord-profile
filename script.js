@@ -569,13 +569,55 @@ function render(user) {
     tick();
 }
 
+// Discord reports when the song started using the OWNER's clock (checked: accurate), but every visitor
+// compares it against their own device clock, and phones are often a minute or more off. That made
+// the time, slider and lyrics drift. We read the real time once from our own host (Date header)
+// and correct for it. Add ?debug to the page address to see the numbers on screen.
+let rawSkew = 0;        // real time minus this device's clock, in ms
+let clockSkew = 0;      // the part we actually apply (ignored when under 3 s)
+(async function syncClock() {
+    try {
+        const t0 = Date.now();
+        const res = await fetch(location.pathname, { method: "HEAD", cache: "no-store" });
+        const t1 = Date.now();
+        const header = res.headers.get("date");
+        const server = header ? new Date(header).getTime() : NaN;
+        if (!isNaN(server)) {
+            rawSkew = server - (t0 + t1) / 2;
+            clockSkew = Math.abs(rawSkew) > 3000 ? rawSkew : 0;
+        }
+    } catch (err) { /* keep the local clock */ }
+})();
+
+const DEBUG = /[?&]debug\b/.test(location.search);
+let debugBox = null;
+function showDebug(now, t, over) {
+    if (!debugBox) {
+        debugBox = document.createElement("pre");
+        debugBox.style.cssText = "position:fixed;left:8px;bottom:8px;z-index:99999;margin:0;padding:8px 10px;" +
+            "background:rgba(0,0,0,.85);color:#7CFC9A;font:11px/1.45 monospace;border:1px solid #2a2a31;border-radius:8px;" +
+            "pointer-events:none;max-width:92vw;white-space:pre-wrap";
+        document.body.appendChild(debugBox);
+    }
+    const f = (ms) => (ms / 1000).toFixed(1) + "s";
+    debugBox.textContent = [
+        "device clock vs real time: " + (rawSkew >= 0 ? "-" : "+") + f(Math.abs(rawSkew)) + (rawSkew >= 0 ? " (behind)" : " (ahead)"),
+        "correction applied: " + (clockSkew ? f(clockSkew) : "none"),
+        t ? "song length: " + f(t.end - t.start) : "song: none",
+        t ? "elapsed (corrected): " + f(now - t.start) : "",
+        t ? "elapsed (raw device clock): " + f(Date.now() - t.start) : "",
+        t ? "state: " + (over ? "OVER (last played)" : "playing") : ""
+    ].filter(Boolean).join("\n");
+}
+
 function tick() {
     if (!latest) return;
-    const now = Date.now();
+    const now = Date.now() + clockSkew;
 
     const t = latest.listening_to_spotify && latest.spotify && latest.spotify.timestamps;
     // Song already finished (or paused) but Discord still lists it: show it as "Last played".
     const over = !!t && now > t.end + 4000;
+    if (DEBUG) showDebug(now, t, over);
     const fill = document.querySelector(".progress > span");
     if (t && fill) {
         const total = t.end - t.start;
