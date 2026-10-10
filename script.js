@@ -569,25 +569,73 @@ function render(user) {
     tick();
 }
 
-// Discord reports when the song started using the OWNER's clock (checked: accurate), but every visitor
-// compares it against their own device clock, and phones are often a minute or more off. That made
-// the time, slider and lyrics drift. We read the real time once from our own host (Date header)
-// and correct for it. Add ?debug to the page address to see the numbers on screen.
-let rawSkew = 0;        // real time minus this device's clock, in ms
-let clockSkew = 0;      // the part we actually apply (ignored when under 3 s)
-(async function syncClock() {
+/* =====================================================================
+   CLOCK SYNC
+   Discord reports when a song started using Discord's own clock, but every
+   visitor compares it against their own device clock, and phones are often
+   a minute or more off. That made the elapsed-time slider and the lyrics
+   sync drift on those devices.
+
+   Fix: read the real time from the Date header our own host returns and
+   apply the difference wherever we use Date.now(). Three details matter:
+   - HTTP dates only have 1-second resolution, so the true server time is
+     somewhere in [header, header + 1000). We add 500 ms to land on the
+     midpoint.
+   - Network latency makes a reading later, never earlier, so a slow sample
+     is worse than a fast one. We take three samples and keep the one with
+     the smallest RTT.
+   - We re-sync every few minutes (and when the tab wakes up) so devices
+     whose clock drifts, or gets NTP-corrected mid-session, still end up
+     right.
+   - If every request fails we keep the last good skew (0 on the very first
+     try).
+   Add ?debug to the page URL to see the numbers on screen.
+   ===================================================================== */
+let rawSkew = 0;      // real time minus this device's clock, in ms
+let clockSkew = 0;    // value we add to Date.now() everywhere
+
+async function sampleSkew() {
+    const t0 = Date.now();
+    let res;
     try {
-        const t0 = Date.now();
-        const res = await fetch(location.pathname, { method: "HEAD", cache: "no-store" });
-        const t1 = Date.now();
-        const header = res.headers.get("date");
-        const server = header ? new Date(header).getTime() : NaN;
-        if (!isNaN(server)) {
-            rawSkew = server - (t0 + t1) / 2;
-            clockSkew = Math.abs(rawSkew) > 3000 ? rawSkew : 0;
-        }
-    } catch (err) { /* keep the local clock */ }
-})();
+        // cache-bust so the Date header is fresh on every sample
+        res = await fetch(location.pathname + "?__clock=" + t0, {
+            method: "HEAD",
+            cache: "no-store",
+        });
+    } catch (e) { return null; }
+    const t1 = Date.now();
+    const header = res.headers.get("date");
+    if (!header) return null;
+    const server = new Date(header).getTime();
+    if (!Number.isFinite(server)) return null;
+    // True server time at response: [server, server + 1000). Use the midpoint.
+    const skew = (server + 500) - (t0 + t1) / 2;
+    return { skew, rtt: t1 - t0 };
+}
+
+async function syncClock() {
+    const samples = [];
+    for (let i = 0; i < 3; i++) {
+        if (i) await new Promise((r) => setTimeout(r, 180));
+        const s = await sampleSkew();
+        if (s) samples.push(s);
+    }
+    if (!samples.length) return;                    // keep last good value
+    samples.sort((a, b) => a.rtt - b.rtt);          // fastest RTT = best sample
+    rawSkew = Math.round(samples[0].skew);
+    clockSkew = rawSkew;                            // no threshold anymore
+    console.info(
+        "[clock] skew " + (rawSkew >= 0 ? "+" : "") + rawSkew +
+        " ms (best rtt " + samples[0].rtt + " ms)"
+    );
+}
+
+syncClock();
+setInterval(syncClock, 3 * 60 * 1000);
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") syncClock();
+});
 
 const DEBUG = /[?&]debug\b/.test(location.search);
 let debugBox = null;
