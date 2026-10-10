@@ -21,10 +21,43 @@
     <div class="background-overlay" aria-hidden="true"></div>
     <canvas id="bg-canvas" aria-hidden="true"></canvas>
 
-    <button class="mute-btn" id="mute-btn" type="button" aria-pressed="false" hidden>
-        <span id="mute-icon" aria-hidden="true">🔇</span>
-        <span id="mute-label">Play music</span>
-    </button>
+    <aside class="player" id="player" aria-label="Music player" hidden>
+        <div class="pl-cover-wrap">
+            <img class="pl-cover" id="pl-cover" alt="">
+            <span class="pl-note" aria-hidden="true">♪</span>
+        </div>
+        <div class="pl-body">
+            <div class="pl-top">
+                <span class="pl-label">Now playing</span>
+                <span class="pl-title" id="pl-title" aria-live="polite">Music</span>
+            </div>
+            <div class="pl-controls">
+                <button class="pl-btn" id="pl-prev" type="button" aria-label="Previous song">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h2v12H6zM9.5 12L18 6v12z"/></svg>
+                </button>
+                <button class="pl-btn pl-main" id="pl-toggle" type="button" aria-pressed="false" aria-label="Play music">
+                    <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+                    <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+                </button>
+                <button class="pl-btn" id="pl-next" type="button" aria-label="Next song">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 6h2v12h-2zM6 18V6l8.5 6z"/></svg>
+                </button>
+                <button class="pl-btn pl-min" id="pl-collapse" type="button" aria-label="Minimize player" aria-expanded="true">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path class="stroke" d="M6 15l6-6 6 6"/></svg>
+                </button>
+            </div>
+            <div class="pl-vol">
+                <button class="pl-btn pl-mute" id="pl-mute" type="button" aria-label="Mute">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 9v6h4l5 4V5L8 9z"/>
+                        <path class="stroke wave" d="M16 8.5a5 5 0 010 7M18.5 6a8.5 8.5 0 010 12"/>
+                        <path class="stroke x" d="M16 9.5l5 5M21 9.5l-5 5"/>
+                    </svg>
+                </button>
+                <input id="pl-volume" type="range" min="0" max="100" value="60" aria-label="Volume">
+            </div>
+        </div>
+    </aside>
 
     <div class="hero">
     <main class="container">
@@ -173,7 +206,14 @@
         </div>
     </div>
 
-    <audio id="bgm" loop preload="none"></audio>
+    <!-- Shown only if the browser blocks autoplay; one click starts the music -->
+    <div id="enter-gate" class="enter-gate" role="button" tabindex="0" aria-label="Click to enter and start the music" hidden>
+        <span class="enter-note" aria-hidden="true">♪</span>
+        <span class="enter-text">Click to enter</span>
+        <span class="enter-sub">music starts automatically</span>
+    </div>
+
+    <audio id="bgm" loop preload="auto"></audio>
     <script src="script.js"></script>
 
     <button id="clan-tag" class="clan-tag" type="button" aria-haspopup="true" aria-expanded="false" hidden></button>

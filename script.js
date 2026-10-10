@@ -1,7 +1,25 @@
 const CONFIG = {
     discordId: "518567677971660812",
-    // Path or URL of a looping audio file. Leave empty to hide the music button.
-    music: "",
+    music: "",   // single song (path or URL). Ignored when "playlist" has songs.
+    // Your songs: the files live in the "music" folder next to index.html.
+    // "title" is what visitors see, "src" must match the file name exactly.
+    playlist: [
+        { title: "Let It Happen", src: "music/letithappen.mp3" },
+        { title: "Borderline", src: "music/borderline.mp3" },
+        { title: "No Bad Energy", src: "music/nobadenergy.mp3" },
+        { title: "Party With a Jagaban", src: "music/partywithajagaban.mp3" },
+        { title: "I'm a Be Alright", src: "music/imabealright.mp3" },
+        { title: "Raincoat", src: "music/raincoat.mp3" },
+        { title: "Nope Your Too Late I Already Died", src: "music/nopeyourtoolateialreadydied.mp3" },
+        { title: "Impostor Syndrome", src: "music/impostorsyndrome.mp3" },
+        { title: "idkidk", src: "music/idkidk.mp3" },
+        { title: "Hex", src: "music/hex.mp3" },
+    ],
+    shuffle: true,       // random order (every song plays once before any repeats)
+    autoplay: true,      // start on page load (see note: browsers may wait for your first click)
+    musicVolume: 0.6,    // starting volume, 0 (silent) to 1 (full). Visitors can change it.
+    // Covers: by default each song uses music/covers/<same name as the mp3>.jpg
+    // (e.g. music/covers/hex.jpg). To use another image add  cover: "path"  to a song.
     // Banner image (path or URL). Leave empty to try your Discord banner automatically.
     banner: "banner.png",
     // Badges Lanyard can't see (Nitro, Server Boost, Orbs, etc.). Add whatever is on your profile.
@@ -587,18 +605,181 @@ CONFIG.links.forEach(({ label, href }) => {
     $("socials").append(a);
 });
 
-if (CONFIG.music) {
-    const audio = $("bgm"), btn = $("mute-btn");
-    audio.src = CONFIG.music;
-    btn.hidden = false;
-    btn.addEventListener("click", async () => {
-        const playing = !audio.paused;
-        if (playing) audio.pause(); else { try { await audio.play(); } catch (e) { return; } }
-        btn.setAttribute("aria-pressed", String(!playing));
-        $("mute-icon").textContent = playing ? "🔇" : "🔊";
-        $("mute-label").textContent = playing ? "Play music" : "Mute music";
+// Music player: cover, play/pause, prev/next, volume, shuffle, autoplay
+(function player() {
+    const list = (CONFIG.playlist && CONFIG.playlist.length)
+        ? CONFIG.playlist
+        : (CONFIG.music ? [{ title: "Music", src: CONFIG.music }] : []);
+    if (!list.length) return;
+
+    const audio = $("bgm"), box = $("player"), toggle = $("pl-toggle");
+    const prev = $("pl-prev"), next = $("pl-next"), titleEl = $("pl-title"), cover = $("pl-cover");
+    const vol = $("pl-volume"), muteBtn = $("pl-mute"), collapse = $("pl-collapse");
+    audio.loop = false;
+    box.hidden = false;
+    if (list.length < 2) { prev.hidden = true; next.hidden = true; }
+
+    const store = {
+        get(k) { try { return localStorage.getItem("player:" + k); } catch (e) { return null; } },
+        set(k, v) { try { localStorage.setItem("player:" + k, v); } catch (e) {} }
+    };
+
+    /* ---------- volume ---------- */
+    let volume = parseFloat(store.get("volume"));
+    if (!isFinite(volume)) volume = CONFIG.musicVolume ?? 0.6;
+    volume = Math.min(1, Math.max(0, volume));
+    let muted = store.get("muted") === "1";
+    const paintVolume = () => {
+        audio.volume = volume;
+        audio.muted = muted;
+        const shown = muted ? 0 : volume;
+        vol.value = Math.round(shown * 100);
+        vol.style.setProperty("--v", vol.value + "%");
+        box.classList.toggle("muted", muted || volume === 0);
+        muteBtn.setAttribute("aria-label", muted || volume === 0 ? "Unmute" : "Mute");
+    };
+    vol.addEventListener("input", () => {
+        volume = vol.value / 100;
+        muted = volume === 0;
+        store.set("volume", volume); store.set("muted", muted ? "1" : "0");
+        paintVolume();
     });
-}
+    muteBtn.addEventListener("click", () => {
+        muted = !(muted || volume === 0);
+        if (!muted && volume === 0) volume = 0.6;
+        store.set("volume", volume); store.set("muted", muted ? "1" : "0");
+        paintVolume();
+    });
+    paintVolume();
+
+    /* ---------- queue (shuffled so nothing repeats until all have played) ---------- */
+    let order = [], pos = 0, current = 0, failures = 0;
+    const makeOrder = (avoid) => {
+        const o = list.map((_, n) => n);
+        if (CONFIG.shuffle) {
+            for (let k = o.length - 1; k > 0; k--) {
+                const j = Math.floor(Math.random() * (k + 1));
+                [o[k], o[j]] = [o[j], o[k]];
+            }
+            if (o.length > 1 && o[0] === avoid) [o[0], o[1]] = [o[1], o[0]];
+        }
+        return o;
+    };
+    const coverFor = (s) => s.cover || s.src.replace(/^music\//, "music/covers/").replace(/\.[^./]+$/, ".jpg");
+
+    const load = (n) => {
+        current = n;
+        const song = list[n];
+        audio.src = song.src;
+        titleEl.textContent = song.title || "Music";
+        titleEl.title = titleEl.textContent;
+        box.classList.remove("has-cover");
+        cover.onload = () => box.classList.add("has-cover");
+        cover.onerror = () => box.classList.remove("has-cover");
+        cover.src = coverFor(song);
+        try {
+            if ("mediaSession" in navigator) {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: titleEl.textContent,
+                    artwork: [{ src: new URL(coverFor(song), location.href).href }]
+                });
+            }
+        } catch (e) {}
+    };
+    const go = (delta) => {
+        pos += delta;
+        if (pos >= order.length) { order = makeOrder(order[order.length - 1]); pos = 0; }
+        if (pos < 0) pos = order.length - 1;
+        load(order[pos]);
+    };
+    const play = () => audio.play().catch(() => {});
+
+    /* ---------- controls ---------- */
+    let userPaused = false;
+    toggle.addEventListener("click", () => {
+        if (audio.paused) { userPaused = false; play(); }
+        else { userPaused = true; audio.pause(); }
+    });
+    next.addEventListener("click", () => { const was = !audio.paused; go(1); if (was) play(); });
+    prev.addEventListener("click", () => {
+        if (audio.currentTime > 3) { audio.currentTime = 0; return; }   // like most players: restart first
+        const was = !audio.paused; go(-1); if (was) play();
+    });
+    collapse.addEventListener("click", () => {
+        const min = box.classList.toggle("min");
+        collapse.setAttribute("aria-expanded", String(!min));
+        collapse.setAttribute("aria-label", min ? "Expand player" : "Minimize player");
+    });
+    if (matchMedia("(max-width: 700px)").matches) {   // keep small screens uncluttered
+        box.classList.add("min");
+        collapse.setAttribute("aria-expanded", "false");
+        collapse.setAttribute("aria-label", "Expand player");
+    }
+
+    audio.addEventListener("play", () => {
+        failures = 0;
+        box.classList.add("playing");
+        toggle.setAttribute("aria-pressed", "true");
+        toggle.setAttribute("aria-label", "Pause music");
+    });
+    audio.addEventListener("pause", () => {
+        box.classList.remove("playing");
+        toggle.setAttribute("aria-pressed", "false");
+        toggle.setAttribute("aria-label", "Play music");
+    });
+    audio.addEventListener("ended", () => { go(1); play(); });
+    // A missing/broken file: skip to the next one, but give up once every song has failed.
+    audio.addEventListener("error", () => {
+        if (++failures >= list.length) { titleEl.textContent = "Music files not found"; return; }
+        go(1); play();
+    });
+
+    try {
+        if ("mediaSession" in navigator) {
+            navigator.mediaSession.setActionHandler("play", () => { userPaused = false; play(); });
+            navigator.mediaSession.setActionHandler("pause", () => { userPaused = true; audio.pause(); });
+            navigator.mediaSession.setActionHandler("previoustrack", () => { go(-1); play(); });
+            navigator.mediaSession.setActionHandler("nexttrack", () => { go(1); play(); });
+        }
+    } catch (e) {}
+
+    /* ---------- start ---------- */
+    order = makeOrder();
+    load(order[0]);
+
+    // Browsers refuse to start sound before the visitor does something on the page.
+    // So: try right away, and if it's blocked, start on the very first click/tap/key press.
+    if (CONFIG.autoplay !== false) {
+        const events = ["pointerdown", "pointerup", "touchend", "keydown", "click"];
+        const disarm = () => events.forEach((ev) => window.removeEventListener(ev, kick, true));
+        function kick(e) {
+            if (e && e.target && box.contains(e.target)) return;   // the player's own buttons decide for themselves
+            if (userPaused) { disarm(); return; }
+            audio.play().then(disarm).catch(() => {});
+        }
+        const gate = $("enter-gate");
+        const openGate = () => {
+            if (!gate) return;
+            gate.hidden = false;
+            gate.focus();
+            const enter = () => {
+                gate.hidden = true;
+                userPaused = false;
+                disarm();
+                play();
+            };
+            gate.addEventListener("click", enter, { once: true });
+            gate.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); enter(); }
+            }, { once: true });
+        };
+        audio.play().catch(() => {
+            events.forEach((ev) => window.addEventListener(ev, kick, true));
+            openGate();
+        });
+        audio.addEventListener("play", () => { if (gate) gate.hidden = true; });
+    }
+})();
 
 fetchOnce();
 connect();
