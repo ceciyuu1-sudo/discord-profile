@@ -1264,3 +1264,70 @@ connect();
             .catch(() => {});
     });
 })();
+
+// Draggable music player: grab it anywhere except the buttons/slider and move it where you like.
+// Position is remembered; double-click the player to put it back in its original corner.
+(function draggablePlayer() {
+    const box = $("player");
+    if (!box) return;
+    const KEY = "player:pos", M = 8;
+    const store = {
+        get() { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } },
+        set(v) { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) {} },
+        del() { try { localStorage.removeItem(KEY); } catch (e) {} }
+    };
+
+    const place = (x, y) => {
+        const r = box.getBoundingClientRect();
+        x = Math.min(Math.max(M, x), Math.max(M, innerWidth - r.width - M));
+        y = Math.min(Math.max(M, y), Math.max(M, innerHeight - r.height - M));
+        box.style.left = x + "px";
+        box.style.top = y + "px";
+        return { x, y };
+    };
+
+    const saved = store.get();
+    if (saved && isFinite(saved.x) && isFinite(saved.y)) place(saved.x, saved.y);
+
+    // keep it on screen when the window shrinks or the player changes size (minimize/expand)
+    const keepInView = () => {
+        if (!box.style.left) return;
+        const r = box.getBoundingClientRect();
+        place(r.left, r.top);
+    };
+    addEventListener("resize", keepInView);
+    if ("ResizeObserver" in window) new ResizeObserver(keepInView).observe(box);
+
+    let dragging = false, dx = 0, dy = 0;
+    box.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0 || e.target.closest("button, input, a")) return;
+        const r = box.getBoundingClientRect();
+        dx = e.clientX - r.left;
+        dy = e.clientY - r.top;
+        dragging = true;
+        box.classList.add("dragging");
+        box.setPointerCapture(e.pointerId);
+        e.preventDefault();
+    });
+    box.addEventListener("pointermove", (e) => {
+        if (dragging) place(e.clientX - dx, e.clientY - dy);
+    });
+    const stop = () => {
+        if (!dragging) return;
+        dragging = false;
+        box.classList.remove("dragging");
+        const r = box.getBoundingClientRect();
+        store.set({ x: Math.round(r.left), y: Math.round(r.top) });
+    };
+    box.addEventListener("pointerup", stop);
+    box.addEventListener("pointercancel", stop);
+
+    box.addEventListener("dblclick", (e) => {
+        if (e.target.closest("button, input, a")) return;
+        box.style.left = "";
+        box.style.top = "";
+        store.del();
+    });
+
+    box.title = "Drag to move · double-click to reset";
+})();

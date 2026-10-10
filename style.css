@@ -1131,3 +1131,82 @@ body {
     100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.2); }
 }
 @media (prefers-reduced-motion: reduce) { .like-btn.liked svg, .heart-pop { animation: none; } }
+
+/* Draggable player */
+.player { cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none; }
+.player.dragging {
+    cursor: grabbing;
+    transition: none;
+    box-shadow: 0 14px 40px rgba(0, 0, 0, .6), 0 0 26px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* =========================================
+   ACCENT LINES: each one takes its element's own color
+   ========================================= */
+.profile-card, .card { position: relative; }
+
+/* cards: a glowing line along the top edge */
+.profile-card { --bar: var(--status); }      /* follows Online / Idle / DND / Offline live */
+.spotify-card { --bar: #1ed760; }            /* Spotify green */
+.game-card    { --bar: var(--accent); }      /* same red as the game card's border */
+
+.profile-card::before,
+.spotify-card::before,
+.game-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 18px;
+    right: 18px;
+    height: 3px;
+    z-index: 4;
+    border-radius: 0 0 3px 3px;
+    background: linear-gradient(90deg, transparent, var(--bar) 18%, var(--bar) 82%, transparent);
+    box-shadow: 0 0 14px var(--bar);
+    pointer-events: none;
+}
+
+/* social pills: a small line under each one, in that platform's color */
+.socials a {
+    position: relative;
+    --line-bg: var(--accent);
+    --line-glow: var(--accent);
+}
+.socials a::after {
+    content: "";
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    bottom: -1px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--line-bg);
+    box-shadow: 0 0 10px var(--line-glow);
+    pointer-events: none;
+    transition: opacity .2s;
+}
+.socials a:is(:hover, :focus-visible)::after { opacity: 0; }   /* the pill fills with its color on hover */
+
+.socials a[data-brand="discord"]   { --line-bg: #5865f2; --line-glow: #5865f2; }
+.socials a[data-brand="tiktok"]    { --line-bg: linear-gradient(90deg, #25f4ee, #fe2c55); --line-glow: #25f4ee; }
+.socials a[data-brand="instagram"] { --line-bg: linear-gradient(90deg, #f9ce34, #ee2a7b, #6228d7); --line-glow: #ee2a7b; }
+.socials a[data-brand="spotify"]   { --line-bg: #1ed760; --line-glow: #1ed760; }
+.socials a[data-brand="github"]    { --line-bg: #f2f2f4; --line-glow: #f2f2f4; }
+
+/* "Using Code" / "Playing ..." bar: top line in the bar's own color (red when live, grey when idle) */
+.activity-status { position: relative; --bar: var(--faint); }
+.activity-status.live { --bar: var(--accent); }
+.activity-status::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 18px;
+    right: 18px;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: linear-gradient(90deg, transparent, var(--bar) 18%, var(--bar) 82%, transparent);
+    box-shadow: 0 0 12px var(--bar);
+    pointer-events: none;
+    transition: opacity .3s;
+}
+.activity-status:not(.live)::before { box-shadow: none; opacity: .6; }
