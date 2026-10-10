@@ -14,6 +14,11 @@ const CONFIG = {
         { title: "Impostor Syndrome", src: "music/impostorsyndrome.mp3" },
         { title: "idkidk", src: "music/idkidk.mp3" },
         { title: "Hex", src: "music/hex.mp3" },
+        { title: "Se Encendió el Beeper", src: "music/seencendioelbeeper.mp3" },
+        { title: "Heart To Heart", src: "music/hearttoheart.mp3" },
+        { title: "Bola", src: "music/bola.mp3" },
+        { title: "Headlock", src: "music/headlock.mp3" },
+        { title: "Worms", src: "music/worms.mp3" },
     ],
     shuffle: true,       // random order (every song plays once before any repeats)
     autoplay: true,      // start on page load (see note: browsers may wait for your first click)
@@ -571,49 +576,44 @@ function render(user) {
 
 /* =====================================================================
    CLOCK SYNC
-   Discord reports when a song started using Discord's clock, and every
-   visitor compares that against their own device clock. If the device is
-   off, the progress bar, elapsed time and lyric highlight drift.
+   Discord reports when a song started using Discord's own clock, but every
+   visitor compares it against their own device clock, and phones are often
+   a minute or more off. That made the elapsed-time slider and the lyrics
+   sync drift on those devices.
 
-   Strategy: read real time from Cloudflare's cdn-cgi/trace endpoint
-   (fast, millisecond precision, CORS enabled, no caching) and fall back
-   to the Date header our own host returns. Take several samples, keep
-   the one with the lowest round-trip time, and apply that as an offset
-   to every Date.now() call. Re-syncs every few minutes and whenever the
-   tab becomes visible.
-
-   Cache is keyed v3, so any broken value from earlier versions is
-   discarded on first load.
+   Fix: read a real time from a JSON API (millisecond precision) and apply
+   the difference wherever we use Date.now(). Falls back to the Date header
+   our host returns, then to a value we cached on a previous visit. Re-syncs
+   every 5 minutes and whenever the tab becomes visible again.
 
    Add ?debug to the page URL to see the numbers on screen.
    ===================================================================== */
-const CLOCK_CACHE_KEY = "clock:skew:v3";
 let rawSkew = 0;      // real time minus this device's clock, in ms
 let clockSkew = 0;    // value we add to Date.now() everywhere
 
-// Reuse a previously measured skew so the first second isn't wrong.
+// Reuse a previously measured skew so the very first second isn't wrong.
 try {
-    const c = JSON.parse(localStorage.getItem(CLOCK_CACHE_KEY) || "null");
-    if (c && typeof c.skew === "number" && Date.now() - c.at < 6 * 60 * 60 * 1000 && Math.abs(c.skew) < 3600_000) {
+    const c = JSON.parse(localStorage.getItem("clock:skew") || "null");
+    if (c && typeof c.skew === "number" && Date.now() - c.at < 6 * 60 * 60 * 1000) {
         rawSkew = clockSkew = Math.round(c.skew);
     }
 } catch (e) {}
 
 async function sampleSkew() {
-    // 1) Cloudflare trace — ms-precision Unix timestamp, no CDN caching.
+    // 1) timeapi.io — JSON, millisecond precision, CORS-enabled
     {
         const t0 = Date.now();
         try {
-            const res = await fetch("https://www.cloudflare.com/cdn-cgi/trace?__=" + t0, { cache: "no-store" });
+            const res = await fetch("https://timeapi.io/api/Time/current/zone?timeZone=UTC",
+                                    { cache: "no-store" });
             const t1 = Date.now();
             if (res.ok) {
-                const text = await res.text();
-                const m = /(?:^|\n)ts=([\d.]+)/.exec(text);
-                if (m) {
-                    const serverMs = parseFloat(m[1]) * 1000;
-                    if (Number.isFinite(serverMs) && serverMs > 1e12) {
-                        return { skew: serverMs - (t0 + t1) / 2, rtt: t1 - t0, source: "cloudflare" };
-                    }
+                const d = await res.json();
+                const ms = Date.parse(d.dateTime || d.dateTimeUtc || "");
+                if (Number.isFinite(ms)) {
+                    // API time is when the server assembled the response.
+                    // Response was generated at ~(t0+t1)/2 on our clock.
+                    return { skew: ms - (t0 + t1) / 2, rtt: t1 - t0, source: "timeapi.io" };
                 }
             }
         } catch (e) {}
@@ -622,14 +622,14 @@ async function sampleSkew() {
     {
         const t0 = Date.now();
         try {
-            const res = await fetch(location.pathname + "?__=" + t0, { method: "HEAD", cache: "no-store" });
+            const res = await fetch(location.pathname + "?__t=" + t0,
+                                    { method: "HEAD", cache: "no-store" });
             const t1 = Date.now();
             const h = res.headers.get("date");
             if (h) {
-                const serverMs = new Date(h).getTime();
-                if (Number.isFinite(serverMs)) {
-                    // HTTP Date rounds down to the nearest second; use the midpoint.
-                    return { skew: (serverMs + 500) - (t0 + t1) / 2, rtt: t1 - t0, source: "date-header" };
+                const ms = new Date(h).getTime();
+                if (Number.isFinite(ms)) {
+                    return { skew: (ms + 500) - (t0 + t1) / 2, rtt: t1 - t0, source: "date-header" };
                 }
             }
         } catch (e) {}
@@ -639,13 +639,13 @@ async function sampleSkew() {
 
 async function syncClock() {
     const samples = [];
-    for (let i = 0; i < 4; i++) {
-        if (i) await new Promise((r) => setTimeout(r, 150));
+    for (let i = 0; i < 3; i++) {
+        if (i) await new Promise((r) => setTimeout(r, 200));
         const s = await sampleSkew();
         if (s) samples.push(s);
     }
     if (!samples.length) {
-        console.warn("[clock] no samples; keeping skew=" + clockSkew + "ms");
+        console.warn("[clock] all samples failed; keeping skew = " + clockSkew + "ms");
         return;
     }
     samples.sort((a, b) => a.rtt - b.rtt);
@@ -656,7 +656,7 @@ async function syncClock() {
     }
     rawSkew = clockSkew = Math.round(best.skew);
     try {
-        localStorage.setItem(CLOCK_CACHE_KEY, JSON.stringify({ skew: rawSkew, at: Date.now() }));
+        localStorage.setItem("clock:skew", JSON.stringify({ skew: rawSkew, at: Date.now() }));
     } catch (e) {}
     console.info(`[clock] skew ${rawSkew >= 0 ? "+" : ""}${rawSkew}ms via ${best.source} (rtt ${best.rtt}ms)`);
 }
@@ -699,7 +699,7 @@ function tick() {
     const fill = document.querySelector(".progress > span");
     if (t && fill) {
         const total = t.end - t.start;
-        const pos = Math.min(total, Math.max(0, now - t.start));
+        const pos = Math.min(total, now - t.start);
         fill.style.width = `${(pos / total) * 100}%`;
         const spans = document.querySelectorAll(".times span");
         spans[0].textContent = fmt(pos);
