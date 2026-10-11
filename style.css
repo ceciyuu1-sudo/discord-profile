@@ -1693,13 +1693,13 @@ body.cursor-ready * {
     .cursor-dot.mode-github     { background: #f2f2f4; box-shadow: 0 0 10px #f2f2f4; }
     .cursor-label.mode-github   { border-color: #f2f2f4; color: #f2f2f4; }
 
-    /* ---- Click / Down State ---- */
+    /* ---- Click / Down State (uses scale property so it doesn't break translate3d) ---- */
     .cursor-ring.is-down {
-        transform: scale(0.72) !important;
+        scale: 0.72;
         background: color-mix(in srgb, var(--accent) 30%, transparent) !important;
     }
     .cursor-dot.is-down {
-        scale: 0.4 !important;
+        scale: 0.4;
     }
     .cursor-ghost.is-down {
         opacity: 0 !important;

@@ -1645,41 +1645,44 @@ setInterval(fetchOnce, 30 * 1000);
         "mode-discord", "mode-spotify", "mode-instagram", "mode-tiktok", "mode-github"
     ];
 
-    document.addEventListener("pointerover", (e) => {
-        if (e.pointerType === "touch") return;
-        const target = e.target;
-        if (!target || target.nodeType !== 1) return;
-
-        const info = getCursorMode(target);
+    let currentMode = null;
+    function applyMode(info) {
+        const nextMode = info ? info.mode : null;
+        if (nextMode === currentMode) return;
+        currentMode = nextMode;
+        ALL_MODES.forEach((m) => {
+            ring.classList.remove(m);
+            dot.classList.remove(m);
+            ghost.classList.remove(m);
+            label.classList.remove(m);
+        });
         if (info) {
-            targetEl = target;
-            ALL_MODES.forEach((m) => {
-                ring.classList.remove(m);
-                dot.classList.remove(m);
-                ghost.classList.remove(m);
-                label.classList.remove(m);
-            });
             ring.classList.add(info.mode);
             dot.classList.add(info.mode);
             ghost.classList.add(info.mode);
             label.classList.add(info.mode);
-
             if (info.label) {
                 label.textContent = info.label;
                 label.style.opacity = "1";
             } else {
                 label.style.opacity = "0";
             }
-            recomputePull();
+        } else {
+            label.style.opacity = "0";
+        }
+    }
+
+    document.addEventListener("pointermove", (e) => {
+        if (e.pointerType === "touch") return;
+        const target = e.target;
+        if (!target || target.nodeType !== 1) return;
+        const info = getCursorMode(target);
+        if (info) {
+            targetEl = target;
+            applyMode(info);
         } else {
             targetEl = null;
-            ALL_MODES.forEach((m) => {
-                ring.classList.remove(m);
-                dot.classList.remove(m);
-                ghost.classList.remove(m);
-                label.classList.remove(m);
-            });
-            label.style.opacity = "0";
+            applyMode(null);
             pullX = 0; pullY = 0;
         }
     }, { passive: true });
