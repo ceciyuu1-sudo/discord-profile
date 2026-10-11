@@ -63,6 +63,7 @@ const CONFIG = {
 
     // Replace each "#" with your real profile link.
     links: [
+        { label: "Discord",   href: "https://discord.com/users/518567677971660812" },
         { label: "TikTok",    href: "https://www.tiktok.com/@ceciyuu1" },
         { label: "Instagram", href: "https://www.instagram.com/ceciyuu1/" },
         { label: "Spotify",   href: "https://open.spotify.com/user/31bclur2u7at3vg5d3lavazxecqe" },
@@ -899,7 +900,8 @@ CONFIG.links.forEach(({ label, href }) => {
     });
     audio.addEventListener("ended", () => { go(1); play(); });
     // A missing/broken file: skip to the next one, but give up once every song has failed.
-    audio.addEventListener("error", () => {
+    audio.addEventListener("error", (e) => {
+        console.warn("[player] Failed to load audio:", audio.src, e);
         if (++failures >= list.length) { titleEl.textContent = "Music files not found"; return; }
         go(1); play();
     });

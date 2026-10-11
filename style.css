@@ -1156,7 +1156,7 @@ html { scroll-behavior: smooth; }
     left: 18px;
     right: 18px;
     height: 3px;
-    z-index: 4;
+    z-index: 10;
     border-radius: 0 0 3px 3px;
     background: linear-gradient(90deg, transparent, var(--bar) 18%, var(--bar) 82%, transparent);
     box-shadow: 0 0 14px var(--bar);
@@ -1488,15 +1488,18 @@ html { scroll-behavior: smooth; }
    ========================================= */
 @media (hover: hover) and (pointer: fine) {
 
-    /* Hide the system cursor everywhere we can see it. */
-    html, body,
-    a, button, input, textarea, select, label,
-    [role="button"], [contenteditable="true"],
-    .pcard, .zoomable, .socials a, .btn, .like-btn,
-    .gb-post, .gb-signin, .gb-more, .gb-del, .gb-link,
-    .player, .pl-btn, .scroll-cue, .clan-tag, .lightbox-btn,
-    .lyrics-sync, .popover-btn, .media-ph {
-        cursor: none;
+    /* Hide the system cursor only when the custom cursor is active and ready */
+    body.cursor-ready,
+    body.cursor-ready a, body.cursor-ready button, body.cursor-ready input,
+    body.cursor-ready textarea, body.cursor-ready select, body.cursor-ready label,
+    body.cursor-ready [role="button"], body.cursor-ready [contenteditable="true"],
+    body.cursor-ready .pcard, body.cursor-ready .zoomable, body.cursor-ready .socials a,
+    body.cursor-ready .btn, body.cursor-ready .like-btn, body.cursor-ready .gb-post,
+    body.cursor-ready .gb-signin, body.cursor-ready .gb-more, body.cursor-ready .gb-del,
+    body.cursor-ready .gb-link, body.cursor-ready .player, body.cursor-ready .pl-btn,
+    body.cursor-ready .scroll-cue, body.cursor-ready .clan-tag, body.cursor-ready .lightbox-btn,
+    body.cursor-ready .lyrics-sync, body.cursor-ready .popover-btn, body.cursor-ready .media-ph {
+        cursor: none !important;
     }
 
     .cursor-dot,
