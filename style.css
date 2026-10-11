@@ -23,7 +23,8 @@ body {
     min-height: 100vh;
     min-height: 100dvh;
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    justify-content: flex-start;
     align-items: center;
     overflow-x: hidden;
     padding: 70px 0 30px;
@@ -176,7 +177,7 @@ body {
 
 .profile-content { padding: 20px; position: relative; }
 
-.avatar-container { position: absolute; top: -50px; left: 20px; width: 90px; height: 90px; }
+.avatar-container { position: absolute; left: 20px; width: 90px; height: 90px; }
 
 #avatar {
     width: 90px;
@@ -202,8 +203,8 @@ body {
     bottom: 2px; right: 2px;
     border: 4px solid var(--panel);
     background: var(--status);
+    z-index: 2;
 }
-.status { z-index: 2; }
 
 .user-info { margin-top: 50px; }
 
@@ -301,7 +302,7 @@ body {
 .media .meta { font-size: .78rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
 
 .progress { margin-top: 14px; height: 3px; background: #26262c; border-radius: 3px; overflow: hidden; }
-.progress > span { display: block; height: 100%; width: 0; background: #1ed760; transition: width 1s linear; }
+.progress > span { display: block; height: 100%; width: 0; background: #1ed760; transition: width .5s linear; }
 .times { display: flex; justify-content: space-between; font-size: .68rem; color: var(--faint); margin-top: 6px; }
 
 .footnote { text-align: center; font-size: .7rem; color: var(--faint); }
@@ -433,6 +434,9 @@ body {
 
 /* Dot Separator */
 .dot-separator { color: var(--faint); margin: 0 2px; }
+/* Hide the bullet when there's no clan tag to separate from */
+#clan-tag[hidden] ~ .dot-separator,
+.name-row:not(:has(#clan-tag:not([hidden]))) .dot-separator { display: none; }
 
 /* Listen-along controls */
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
@@ -767,13 +771,6 @@ body {
 
 html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
-
-/* Stack hero + about vertically (body was a single centred row) */
-body {
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: center;
-}
 
 /* ---------- Main page: hero + scroll arrow ---------- */
 .hero {
@@ -1359,8 +1356,8 @@ body {
 .card .btn:hover { transform: translateY(-1px); }
 .spotify-card .btn:hover { background: rgba(30, 215, 96, .12); }
 .game-card .btn:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
-.spotify-card .actions .btn:first-child { background: #1ed760; color: #08130c; border-color: #1ed760; font-weight: 700; }
-.spotify-card .actions .btn:first-child:hover { background: #3ee57a; border-color: #3ee57a; }
+.spotify-card .actions .btn:first-child[aria-expanded="false"] { background: #1ed760; color: #08130c; border-color: #1ed760; font-weight: 700; }
+.spotify-card .actions .btn:first-child[aria-expanded="false"]:hover { background: #3ee57a; border-color: #3ee57a; }
 
 /* ---- Game card ---- */
 .game-card .media { gap: 14px; }
@@ -1485,14 +1482,21 @@ body {
 
 /* =========================================
    CUSTOM CURSOR
-   Only kicks in once JS adds `has-cursor` to the body. If JS fails
-   for any reason, none of this applies and the default cursor stays.
+   A red dot sits exactly on the pointer; a ring eases behind it and
+   grows over anything clickable; a fainter ghost ring trails further
+   back. Skipped on touch devices and for reduced-motion users.
    ========================================= */
 @media (hover: hover) and (pointer: fine) {
 
-    body.has-cursor,
-    body.has-cursor * {
-        cursor: none !important;
+    /* Hide the system cursor everywhere we can see it. */
+    html, body,
+    a, button, input, textarea, select, label,
+    [role="button"], [contenteditable="true"],
+    .pcard, .zoomable, .socials a, .btn, .like-btn,
+    .gb-post, .gb-signin, .gb-more, .gb-del, .gb-link,
+    .player, .pl-btn, .scroll-cue, .clan-tag, .lightbox-btn,
+    .lyrics-sync, .popover-btn, .media-ph {
+        cursor: none;
     }
 
     .cursor-dot,
@@ -1509,6 +1513,7 @@ body {
         transition: opacity .3s ease;
     }
 
+    /* ---- dot: sits exactly on the pointer ---- */
     .cursor-dot {
         width: 6px;
         height: 6px;
@@ -1517,8 +1522,14 @@ body {
         box-shadow:
             0 0 8px var(--accent),
             0 0 20px color-mix(in srgb, var(--accent) 55%, transparent);
+        transition:
+            opacity .3s ease,
+            scale .15s ease,
+            background-color .2s ease,
+            box-shadow .2s ease;
     }
 
+    /* ---- ring: eases behind, expands over clickable things ---- */
     .cursor-ring {
         width: 34px;
         height: 34px;
@@ -1537,6 +1548,7 @@ body {
             box-shadow .25s ease;
     }
 
+    /* ---- ghost: very faint trailing ring, furthest behind ---- */
     .cursor-ghost {
         width: 22px;
         height: 22px;
@@ -1544,10 +1556,12 @@ body {
         border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
     }
 
-    body.has-cursor.cursor-ready .cursor-dot   { opacity: 1; }
-    body.has-cursor.cursor-ready .cursor-ring  { opacity: 1; }
-    body.has-cursor.cursor-ready .cursor-ghost { opacity: .45; }
+    /* ---- reveal once the pointer has moved at least once ---- */
+    body.cursor-ready .cursor-dot   { opacity: 1; }
+    body.cursor-ready .cursor-ring  { opacity: 1; }
+    body.cursor-ready .cursor-ghost { opacity: .45; }
 
+    /* ---- hover state: ring grows and fills, dot shrinks and whitens ---- */
     .cursor-ring.is-hover {
         width: 60px;
         height: 60px;
@@ -1559,19 +1573,21 @@ body {
             inset 0 0 18px color-mix(in srgb, var(--accent) 28%, transparent);
     }
     .cursor-dot.is-hover {
+        scale: .65;
         background: #fff;
         box-shadow:
             0 0 10px var(--accent),
             0 0 24px var(--accent);
     }
 
+    /* ---- pressed state: everything shrinks briefly ---- */
     .cursor-ring.is-down {
         width: 24px;
         height: 24px;
         margin: -12px 0 0 -12px;
         background: color-mix(in srgb, var(--accent) 22%, transparent);
     }
-    .cursor-dot.is-down   { opacity: .5; }
+    .cursor-dot.is-down  { scale: .45; }
     .cursor-ghost.is-down { opacity: 0; }
 
     @media (prefers-reduced-motion: reduce) {
