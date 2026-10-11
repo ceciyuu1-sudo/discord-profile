@@ -63,7 +63,7 @@ const CONFIG = {
 
     // Replace each "#" with your real profile link.
     links: [
-        { label: "Discord",   href: "https://discord.gg/8azxtkMMhX" },
+        { label: "Discord",   href: "https://discord.com/users/518567677971660812" },
         { label: "TikTok",    href: "https://www.tiktok.com/@ceciyuu1" },
         { label: "Instagram", href: "https://www.instagram.com/ceciyuu1/" },
         { label: "Spotify",   href: "https://open.spotify.com/user/31bclur2u7at3vg5d3lavazxecqe" },
@@ -1536,8 +1536,10 @@ setInterval(fetchOnce, 30 * 1000);
    Skipped on touch devices and for reduced-motion users.
    ========================================= */
 (function customCursor() {
-    if (!matchMedia("(hover: hover) and (pointer: fine)").matches) return;
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // Skip on touch-only mobile devices if touch event is primary
+    if (window.matchMedia && window.matchMedia("(pointer: coarse)").matches && !window.matchMedia("(pointer: fine)").matches) {
+        return;
+    }
 
     const dot   = document.createElement("div");
     const ring  = document.createElement("div");
