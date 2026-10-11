@@ -1485,21 +1485,14 @@ body {
 
 /* =========================================
    CUSTOM CURSOR
-   A red dot sits exactly on the pointer; a ring eases behind it and
-   grows over anything clickable; a fainter ghost ring trails further
-   back. Skipped on touch devices and for reduced-motion users.
+   Only kicks in once JS adds `has-cursor` to the body. If JS fails
+   for any reason, none of this applies and the default cursor stays.
    ========================================= */
 @media (hover: hover) and (pointer: fine) {
 
-    /* Hide the system cursor everywhere we can see it. */
-    html, body,
-    a, button, input, textarea, select, label,
-    [role="button"], [contenteditable="true"],
-    .pcard, .zoomable, .socials a, .btn, .like-btn,
-    .gb-post, .gb-signin, .gb-more, .gb-del, .gb-link,
-    .player, .pl-btn, .scroll-cue, .clan-tag, .lightbox-btn,
-    .lyrics-sync, .popover-btn, .media-ph {
-        cursor: none;
+    body.has-cursor,
+    body.has-cursor * {
+        cursor: none !important;
     }
 
     .cursor-dot,
@@ -1516,7 +1509,6 @@ body {
         transition: opacity .3s ease;
     }
 
-    /* ---- dot: sits exactly on the pointer ---- */
     .cursor-dot {
         width: 6px;
         height: 6px;
@@ -1525,14 +1517,8 @@ body {
         box-shadow:
             0 0 8px var(--accent),
             0 0 20px color-mix(in srgb, var(--accent) 55%, transparent);
-        transition:
-            opacity .3s ease,
-            scale .15s ease,
-            background-color .2s ease,
-            box-shadow .2s ease;
     }
 
-    /* ---- ring: eases behind, expands over clickable things ---- */
     .cursor-ring {
         width: 34px;
         height: 34px;
@@ -1551,7 +1537,6 @@ body {
             box-shadow .25s ease;
     }
 
-    /* ---- ghost: very faint trailing ring, furthest behind ---- */
     .cursor-ghost {
         width: 22px;
         height: 22px;
@@ -1559,12 +1544,10 @@ body {
         border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
     }
 
-    /* ---- reveal once the pointer has moved at least once ---- */
-    body.cursor-ready .cursor-dot   { opacity: 1; }
-    body.cursor-ready .cursor-ring  { opacity: 1; }
-    body.cursor-ready .cursor-ghost { opacity: .45; }
+    body.has-cursor.cursor-ready .cursor-dot   { opacity: 1; }
+    body.has-cursor.cursor-ready .cursor-ring  { opacity: 1; }
+    body.has-cursor.cursor-ready .cursor-ghost { opacity: .45; }
 
-    /* ---- hover state: ring grows and fills, dot shrinks and whitens ---- */
     .cursor-ring.is-hover {
         width: 60px;
         height: 60px;
@@ -1576,21 +1559,19 @@ body {
             inset 0 0 18px color-mix(in srgb, var(--accent) 28%, transparent);
     }
     .cursor-dot.is-hover {
-        scale: .65;
         background: #fff;
         box-shadow:
             0 0 10px var(--accent),
             0 0 24px var(--accent);
     }
 
-    /* ---- pressed state: everything shrinks briefly ---- */
     .cursor-ring.is-down {
         width: 24px;
         height: 24px;
         margin: -12px 0 0 -12px;
         background: color-mix(in srgb, var(--accent) 22%, transparent);
     }
-    .cursor-dot.is-down  { scale: .45; }
+    .cursor-dot.is-down   { opacity: .5; }
     .cursor-ghost.is-down { opacity: 0; }
 
     @media (prefers-reduced-motion: reduce) {
