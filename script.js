@@ -1532,7 +1532,7 @@ setInterval(fetchOnce, 30 * 1000);
    CUSTOM CURSOR
    Three layers: a dot that sits exactly on the pointer, a ring that
    eases behind it, and a fainter ghost ring trailing further back.
-   The ring grows and pulls gently toward clickable elements.
+   The ring grows over clickable elements but always stays centred on the pointer.
    Skipped on touch devices and for reduced-motion users.
    ========================================= */
 (function customCursor() {
@@ -1556,17 +1556,6 @@ setInterval(fetchOnce, 30 * 1000);
     let gx = -200, gy = -200;      // ghost (eases further behind)
     let ready = false;
 
-    // Magnetic pull toward interactive element centers
-    let pullX = 0, pullY = 0, targetEl = null;
-    const recomputePull = () => {
-        if (!targetEl) { pullX = 0; pullY = 0; return; }
-        const r = targetEl.getBoundingClientRect();
-        const cx = r.left + r.width  / 2;
-        const cy = r.top  + r.height / 2;
-        pullX = Math.max(-10, Math.min(10, (cx - mx) * 0.22));
-        pullY = Math.max(-10, Math.min(10, (cy - my) * 0.22));
-    };
-
     window.addEventListener("pointermove", (e) => {
         if (e.pointerType === "touch") return;
         mx = e.clientX;
@@ -1577,8 +1566,10 @@ setInterval(fetchOnce, 30 * 1000);
             gx = mx; gy = my;
             document.body.classList.add("cursor-ready");
         }
-        recomputePull();
     }, { passive: true });
+
+    // Half the ring's current size + a small gap, so the tag clears the ring
+    const labelGap = () => Math.round(ring.offsetWidth / 2) + 6;
 
     // Animation loop: Smooth lerp interpolation directly centered on pointer
     (function loop() {
@@ -1589,7 +1580,12 @@ setInterval(fetchOnce, 30 * 1000);
         dot.style.transform   = `translate3d(${mx}px, ${my}px, 0)`;
         ring.style.transform  = `translate3d(${rx}px, ${ry}px, 0)`;
         ghost.style.transform = `translate3d(${gx}px, ${gy}px, 0)`;
-        label.style.transform = `translate3d(${mx + 16}px, ${my + 16}px, 0)`;
+        // Park the tag just outside the ring (never over the control), flip near edges
+        const off = labelGap();
+        const lw = label.offsetWidth, lh = label.offsetHeight;
+        const lx = (mx + off + lw > innerWidth  - 6) ? mx - off - lw : mx + off;
+        const ly = (my + off + lh > innerHeight - 6) ? my - off - lh : my + off;
+        label.style.transform = `translate3d(${lx}px, ${ly}px, 0)`;
         requestAnimationFrame(loop);
     })();
 
@@ -1610,7 +1606,7 @@ setInterval(fetchOnce, 30 * 1000);
             return { mode: "mode-card", label: "View Details" };
         }
         // 4. Music Player buttons & interactive controls
-        if (el.closest(".pl-btn, #pl-toggle, #pl-next, #pl-prev, #pl-mute, #pl-volume, .lyrics-sync")) {
+        if (el.closest(".pl-btn, #pl-toggle, #pl-next, #pl-prev, #pl-mute, #pl-volume, #pl-collapse, .lyrics-sync")) {
             return { mode: "mode-music", label: "Play ♫" };
         }
         // 5. Social Pills with brand styling
@@ -1632,8 +1628,8 @@ setInterval(fetchOnce, 30 * 1000);
         if (el.closest(".clan-tag, .popover-btn")) {
             return { mode: "mode-discord", label: "Server ✤" };
         }
-        // 8. General buttons / links
-        if (el.closest("a, button, [role='button'], .btn, .gb-post, .gb-signin, .gb-del")) {
+        // 8. General buttons / links (real controls only, not the cards that contain them)
+        if (el.closest("a[href], button, [role='button'], .btn, .gb-post, .gb-signin, .gb-del")) {
             return { mode: "mode-link", label: "" };
         }
         return null;
@@ -1677,12 +1673,9 @@ setInterval(fetchOnce, 30 * 1000);
         if (!target || target.nodeType !== 1) return;
         const info = getCursorMode(target);
         if (info) {
-            targetEl = target;
             applyMode(info);
         } else {
-            targetEl = null;
             applyMode(null);
-            pullX = 0; pullY = 0;
         }
     }, { passive: true });
 
