@@ -1484,15 +1484,14 @@ html { scroll-behavior: smooth; }
    CUSTOM CURSOR
    A red dot sits exactly on the pointer; a ring eases behind it and
    grows over anything clickable; a fainter ghost ring trails further
-   back. Skipped on touch devices and for reduced-motion users.
+   back.
    ========================================= */
-@media (hover: hover) and (pointer: fine) {
 
-    /* Hide the system cursor only when custom cursor is actively running */
-    body.cursor-ready,
-    body.cursor-ready * {
-        cursor: none !important;
-    }
+/* Hide the system cursor only when custom cursor is actively running */
+body.cursor-ready,
+body.cursor-ready * {
+    cursor: none !important;
+}
 
     .cursor-dot,
     .cursor-ring,
@@ -1709,4 +1708,3 @@ html { scroll-behavior: smooth; }
     @media (prefers-reduced-motion: reduce) {
         .cursor-dot, .cursor-ring, .cursor-ghost, .cursor-label { transition: none !important; }
     }
-}
