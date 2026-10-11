@@ -1488,112 +1488,225 @@ html { scroll-behavior: smooth; }
    ========================================= */
 @media (hover: hover) and (pointer: fine) {
 
-    /* Hide the system cursor only when the custom cursor is active and ready */
+    /* Hide the system cursor only when custom cursor is actively running */
     body.cursor-ready,
-    body.cursor-ready a, body.cursor-ready button, body.cursor-ready input,
-    body.cursor-ready textarea, body.cursor-ready select, body.cursor-ready label,
-    body.cursor-ready [role="button"], body.cursor-ready [contenteditable="true"],
-    body.cursor-ready .pcard, body.cursor-ready .zoomable, body.cursor-ready .socials a,
-    body.cursor-ready .btn, body.cursor-ready .like-btn, body.cursor-ready .gb-post,
-    body.cursor-ready .gb-signin, body.cursor-ready .gb-more, body.cursor-ready .gb-del,
-    body.cursor-ready .gb-link, body.cursor-ready .player, body.cursor-ready .pl-btn,
-    body.cursor-ready .scroll-cue, body.cursor-ready .clan-tag, body.cursor-ready .lightbox-btn,
-    body.cursor-ready .lyrics-sync, body.cursor-ready .popover-btn, body.cursor-ready .media-ph {
+    body.cursor-ready * {
         cursor: none !important;
     }
 
     .cursor-dot,
     .cursor-ring,
-    .cursor-ghost {
+    .cursor-ghost,
+    .cursor-label {
         position: fixed;
         top: 0;
         left: 0;
         pointer-events: none;
-        z-index: 999999;
+        z-index: 9999999;
         border-radius: 50%;
         opacity: 0;
-        will-change: transform;
-        transition: opacity .3s ease;
+        will-change: transform, width, height, background-color, border-color, box-shadow;
+        transition: opacity .25s ease;
     }
 
-    /* ---- dot: sits exactly on the pointer ---- */
+    /* ---- 1. Precision Center Dot / Reticle ---- */
     .cursor-dot {
         width: 6px;
         height: 6px;
         margin: -3px 0 0 -3px;
         background: var(--accent);
         box-shadow:
-            0 0 8px var(--accent),
-            0 0 20px color-mix(in srgb, var(--accent) 55%, transparent);
+            0 0 10px var(--accent),
+            0 0 22px color-mix(in srgb, var(--accent) 70%, transparent);
         transition:
-            opacity .3s ease,
-            scale .15s ease,
+            opacity .25s ease,
+            scale .2s cubic-bezier(.2, .9, .3, 1.3),
             background-color .2s ease,
             box-shadow .2s ease;
     }
 
-    /* ---- ring: eases behind, expands over clickable things ---- */
+    /* ---- 2. Primary Fluid Ring ---- */
     .cursor-ring {
         width: 34px;
         height: 34px;
         margin: -17px 0 0 -17px;
-        border: 1.5px solid color-mix(in srgb, var(--accent) 75%, transparent);
+        border: 1.5px solid color-mix(in srgb, var(--accent) 80%, transparent);
+        background: transparent;
         box-shadow:
-            0 0 14px color-mix(in srgb, var(--accent) 35%, transparent),
-            inset 0 0 10px color-mix(in srgb, var(--accent) 18%, transparent);
+            0 0 15px color-mix(in srgb, var(--accent) 35%, transparent),
+            inset 0 0 8px color-mix(in srgb, var(--accent) 15%, transparent);
         transition:
-            opacity .3s ease,
-            width .28s cubic-bezier(.2, .9, .3, 1.4),
-            height .28s cubic-bezier(.2, .9, .3, 1.4),
-            margin .28s cubic-bezier(.2, .9, .3, 1.4),
+            opacity .25s ease,
+            width .25s cubic-bezier(.2, .9, .3, 1.4),
+            height .25s cubic-bezier(.2, .9, .3, 1.4),
+            margin .25s cubic-bezier(.2, .9, .3, 1.4),
             background-color .25s ease,
             border-color .25s ease,
+            border-radius .25s ease,
             box-shadow .25s ease;
     }
 
-    /* ---- ghost: very faint trailing ring, furthest behind ---- */
+    /* ---- 3. Outer Trailing Ghost Ring ---- */
     .cursor-ghost {
-        width: 22px;
-        height: 22px;
-        margin: -11px 0 0 -11px;
-        border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+        width: 18px;
+        height: 18px;
+        margin: -9px 0 0 -9px;
+        border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+        transition:
+            opacity .25s ease,
+            border-color .25s ease,
+            scale .25s ease;
     }
 
-    /* ---- reveal once the pointer has moved at least once ---- */
+    /* ---- 4. Floating Context Pill Badge ---- */
+    .cursor-label {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #fff;
+        background: rgba(12, 12, 16, 0.92);
+        border: 1px solid var(--accent);
+        padding: 2px 7px;
+        border-radius: 4px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.7);
+        white-space: nowrap;
+        margin: 18px 0 0 18px;
+        transform-origin: top left;
+        transition: opacity .2s ease, transform .2s ease, border-color .2s ease;
+    }
+
+    /* Reveal once pointer moves */
     body.cursor-ready .cursor-dot   { opacity: 1; }
     body.cursor-ready .cursor-ring  { opacity: 1; }
-    body.cursor-ready .cursor-ghost { opacity: .45; }
+    body.cursor-ready .cursor-ghost { opacity: .4; }
 
-    /* ---- hover state: ring grows and fills, dot shrinks and whitens ---- */
-    .cursor-ring.is-hover {
-        width: 60px;
-        height: 60px;
-        margin: -30px 0 0 -30px;
-        background: color-mix(in srgb, var(--accent) 12%, transparent);
+    /* ========================================================
+       CONTEXTUAL MORPHING STATES
+       ======================================================== */
+
+    /* [Default Clickable / Link] */
+    .cursor-ring.mode-link {
+        width: 52px;
+        height: 52px;
+        margin: -26px 0 0 -26px;
+        background: color-mix(in srgb, var(--accent) 15%, transparent);
         border-color: var(--accent);
-        box-shadow:
-            0 0 28px color-mix(in srgb, var(--accent) 55%, transparent),
-            inset 0 0 18px color-mix(in srgb, var(--accent) 28%, transparent);
+        box-shadow: 0 0 25px color-mix(in srgb, var(--accent) 50%, transparent);
     }
-    .cursor-dot.is-hover {
-        scale: .65;
+    .cursor-dot.mode-link {
+        scale: .6;
         background: #fff;
-        box-shadow:
-            0 0 10px var(--accent),
-            0 0 24px var(--accent);
     }
 
-    /* ---- pressed state: everything shrinks briefly ---- */
-    .cursor-ring.is-down {
-        width: 24px;
-        height: 24px;
-        margin: -12px 0 0 -12px;
-        background: color-mix(in srgb, var(--accent) 22%, transparent);
+    /* [Music / Audio Controls] */
+    .cursor-ring.mode-music {
+        width: 58px;
+        height: 58px;
+        margin: -29px 0 0 -29px;
+        border-color: #1ed760;
+        background: rgba(30, 215, 96, 0.12);
+        box-shadow: 0 0 26px rgba(30, 215, 96, 0.45);
     }
-    .cursor-dot.is-down  { scale: .45; }
-    .cursor-ghost.is-down { opacity: 0; }
+    .cursor-dot.mode-music {
+        background: #1ed760;
+        box-shadow: 0 0 12px #1ed760;
+        scale: 0.8;
+    }
+    .cursor-ghost.mode-music {
+        border-color: rgba(30, 215, 96, 0.6);
+        scale: 1.3;
+    }
+    .cursor-label.mode-music {
+        border-color: #1ed760;
+        color: #1ed760;
+    }
+
+    /* [Cards / Posters / Gallery preview] */
+    .cursor-ring.mode-card {
+        width: 68px;
+        height: 68px;
+        margin: -34px 0 0 -34px;
+        border-radius: 14px;
+        border-color: #ff3355;
+        background: rgba(255, 51, 85, 0.1);
+        box-shadow: 0 0 30px rgba(255, 51, 85, 0.35);
+    }
+    .cursor-dot.mode-card {
+        scale: 0.5;
+        background: #fff;
+    }
+    .cursor-label.mode-card {
+        border-color: var(--accent);
+    }
+
+    /* [Text Input / Form / Message Wall] */
+    .cursor-ring.mode-text {
+        width: 4px;
+        height: 28px;
+        margin: -14px 0 0 -2px;
+        border-radius: 2px;
+        border: none;
+        background: var(--accent);
+        box-shadow: 0 0 12px var(--accent);
+    }
+    .cursor-dot.mode-text {
+        opacity: 0;
+    }
+    .cursor-ghost.mode-text {
+        opacity: 0;
+    }
+
+    /* [Zoom / Lightbox preview] */
+    .cursor-ring.mode-zoom {
+        width: 54px;
+        height: 54px;
+        margin: -27px 0 0 -27px;
+        border-style: dashed;
+        border-color: #fff;
+        background: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 0 20px rgba(255, 255, 255, 0.35);
+    }
+    .cursor-dot.mode-zoom {
+        scale: 0.5;
+        background: #fff;
+    }
+
+    /* [Brand-Specific Hover on Social Pills] */
+    .cursor-ring.mode-discord   { border-color: #5865f2; background: rgba(88, 101, 242, 0.2); box-shadow: 0 0 24px rgba(88, 101, 242, 0.5); }
+    .cursor-dot.mode-discord    { background: #5865f2; box-shadow: 0 0 10px #5865f2; }
+    .cursor-label.mode-discord  { border-color: #5865f2; color: #7289da; }
+
+    .cursor-ring.mode-spotify   { border-color: #1ed760; background: rgba(30, 215, 96, 0.2); box-shadow: 0 0 24px rgba(30, 215, 96, 0.5); }
+    .cursor-dot.mode-spotify    { background: #1ed760; box-shadow: 0 0 10px #1ed760; }
+    .cursor-label.mode-spotify  { border-color: #1ed760; color: #1ed760; }
+
+    .cursor-ring.mode-instagram { border-color: #e4405f; background: rgba(228, 64, 95, 0.2); box-shadow: 0 0 24px rgba(228, 64, 95, 0.5); }
+    .cursor-dot.mode-instagram  { background: #e4405f; box-shadow: 0 0 10px #e4405f; }
+    .cursor-label.mode-instagram{ border-color: #e4405f; color: #e4405f; }
+
+    .cursor-ring.mode-tiktok    { border-color: #25f4ee; background: rgba(37, 244, 238, 0.2); box-shadow: 0 0 24px rgba(37, 244, 238, 0.5); }
+    .cursor-dot.mode-tiktok     { background: #25f4ee; box-shadow: 0 0 10px #25f4ee; }
+    .cursor-label.mode-tiktok   { border-color: #25f4ee; color: #25f4ee; }
+
+    .cursor-ring.mode-github    { border-color: #f2f2f4; background: rgba(242, 242, 244, 0.2); box-shadow: 0 0 24px rgba(242, 242, 244, 0.5); }
+    .cursor-dot.mode-github     { background: #f2f2f4; box-shadow: 0 0 10px #f2f2f4; }
+    .cursor-label.mode-github   { border-color: #f2f2f4; color: #f2f2f4; }
+
+    /* ---- Click / Down State ---- */
+    .cursor-ring.is-down {
+        transform: scale(0.72) !important;
+        background: color-mix(in srgb, var(--accent) 30%, transparent) !important;
+    }
+    .cursor-dot.is-down {
+        scale: 0.4 !important;
+    }
+    .cursor-ghost.is-down {
+        opacity: 0 !important;
+    }
 
     @media (prefers-reduced-motion: reduce) {
-        .cursor-dot, .cursor-ring, .cursor-ghost { transition: opacity .2s ease; }
+        .cursor-dot, .cursor-ring, .cursor-ghost, .cursor-label { transition: none !important; }
     }
 }
