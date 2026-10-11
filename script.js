@@ -1542,26 +1542,27 @@ setInterval(fetchOnce, 30 * 1000);
     const dot   = document.createElement("div");
     const ring  = document.createElement("div");
     const ghost = document.createElement("div");
+    const label = document.createElement("div");
     dot.className   = "cursor-dot";
     ring.className  = "cursor-ring";
     ghost.className = "cursor-ghost";
-    document.body.append(ghost, ring, dot);
+    label.className = "cursor-label";
+    document.body.append(ghost, ring, dot, label);
 
     let mx = -200, my = -200;      // pointer target
     let rx = -200, ry = -200;      // ring  (eases behind)
     let gx = -200, gy = -200;      // ghost (eases further behind)
     let ready = false;
 
-    // Magnetic pull — when the pointer is inside a clickable element, the
-    // ring is nudged toward the element's centre (capped at 10px).
+    // Magnetic pull toward interactive element centers
     let pullX = 0, pullY = 0, targetEl = null;
     const recomputePull = () => {
         if (!targetEl) { pullX = 0; pullY = 0; return; }
         const r = targetEl.getBoundingClientRect();
         const cx = r.left + r.width  / 2;
         const cy = r.top  + r.height / 2;
-        pullX = Math.max(-10, Math.min(10, (cx - mx) * 0.25));
-        pullY = Math.max(-10, Math.min(10, (cy - my) * 0.25));
+        pullX = Math.max(-10, Math.min(10, (cx - mx) * 0.22));
+        pullY = Math.max(-10, Math.min(10, (cy - my) * 0.22));
     };
 
     window.addEventListener("pointermove", (e) => {
@@ -1579,36 +1580,104 @@ setInterval(fetchOnce, 30 * 1000);
 
     // Animation loop
     (function loop() {
-        rx += (mx + pullX - rx) * 0.22;
-        ry += (my + pullY - ry) * 0.22;
-        gx += (mx - gx) * 0.10;
-        gy += (my - gy) * 0.10;
+        rx += (mx + pullX - rx) * 0.24;
+        ry += (my + pullY - ry) * 0.24;
+        gx += (mx - gx) * 0.12;
+        gy += (my - gy) * 0.12;
         dot.style.transform   = `translate3d(${mx}px, ${my}px, 0)`;
         ring.style.transform  = `translate3d(${rx}px, ${ry}px, 0)`;
         ghost.style.transform = `translate3d(${gx}px, ${gy}px, 0)`;
+        label.style.transform = `translate3d(${mx}px, ${my}px, 0)`;
         requestAnimationFrame(loop);
     })();
 
-    // Hover state — track which element the pointer is over.
-    const INTERACTIVE = 'a, button, input, textarea, select, label, [role="button"], ' +
-        '[contenteditable="true"], .pcard, .zoomable, .btn, .like-btn, .gb-post, ' +
-        '.gb-signin, .gb-more, .gb-del, .gb-link, .player, .pl-btn, .scroll-cue, ' +
-        '.clan-tag, .lightbox-btn, .lyrics-sync, .popover-btn, .socials a';
+    // Categorize element types for custom morphing & floating badge
+    function getCursorMode(el) {
+        if (!el || el === document.body || el === document.documentElement) return null;
+
+        // 1. Text input / forms
+        if (el.closest("textarea, input[type='text'], input:not([type]), [contenteditable='true']")) {
+            return { mode: "mode-text", label: "" };
+        }
+        // 2. Lightbox / zoomable images
+        if (el.closest(".zoomable, .lightbox-stage img, #banner-img, #avatar")) {
+            return { mode: "mode-zoom", label: "Inspect ⌕" };
+        }
+        // 3. Media cards (Favorites, Posters)
+        if (el.closest(".pcard")) {
+            return { mode: "mode-card", label: "View Details" };
+        }
+        // 4. Music Player & Spotify controls
+        if (el.closest(".player, #player, .pl-btn, .spotify-card, .lyrics-sync")) {
+            if (el.closest("#pl-toggle, #pl-next, #pl-prev")) return { mode: "mode-music", label: "Track ♫" };
+            return { mode: "mode-music", label: "Sound ♫" };
+        }
+        // 5. Social Pills with brand styling
+        const social = el.closest(".socials a");
+        if (social) {
+            const brand = (social.dataset.brand || social.textContent).toLowerCase().trim();
+            if (brand.includes("discord"))   return { mode: "mode-discord",   label: "Discord ✤" };
+            if (brand.includes("spotify"))   return { mode: "mode-spotify",   label: "Spotify ♬" };
+            if (brand.includes("instagram")) return { mode: "mode-instagram", label: "Instagram ✦" };
+            if (brand.includes("tiktok"))    return { mode: "mode-tiktok",    label: "TikTok ♪" };
+            if (brand.includes("github"))    return { mode: "mode-github",    label: "GitHub ⎇" };
+            return { mode: "mode-link", label: "External ↗" };
+        }
+        // 6. Like button
+        if (el.closest(".like-btn")) {
+            return { mode: "mode-link", label: "Love ♥" };
+        }
+        // 7. Clan tag server popover
+        if (el.closest(".clan-tag, .popover-btn")) {
+            return { mode: "mode-discord", label: "Server ✤" };
+        }
+        // 8. General buttons / links
+        if (el.closest("a, button, [role='button'], .btn, .gb-post, .gb-signin, .gb-del")) {
+            return { mode: "mode-link", label: "" };
+        }
+        return null;
+    }
+
+    const ALL_MODES = [
+        "mode-link", "mode-music", "mode-card", "mode-text", "mode-zoom",
+        "mode-discord", "mode-spotify", "mode-instagram", "mode-tiktok", "mode-github"
+    ];
 
     document.addEventListener("pointerover", (e) => {
         if (e.pointerType === "touch") return;
-        const t = e.target;
-        if (!t || t.nodeType !== 1) return;
-        const hit = t.closest(INTERACTIVE);
-        if (hit) {
-            targetEl = hit;
-            ring.classList.add("is-hover");
-            dot.classList.add("is-hover");
+        const target = e.target;
+        if (!target || target.nodeType !== 1) return;
+
+        const info = getCursorMode(target);
+        if (info) {
+            targetEl = target;
+            ALL_MODES.forEach((m) => {
+                ring.classList.remove(m);
+                dot.classList.remove(m);
+                ghost.classList.remove(m);
+                label.classList.remove(m);
+            });
+            ring.classList.add(info.mode);
+            dot.classList.add(info.mode);
+            ghost.classList.add(info.mode);
+            label.classList.add(info.mode);
+
+            if (info.label) {
+                label.textContent = info.label;
+                label.style.opacity = "1";
+            } else {
+                label.style.opacity = "0";
+            }
             recomputePull();
         } else {
             targetEl = null;
-            ring.classList.remove("is-hover");
-            dot.classList.remove("is-hover");
+            ALL_MODES.forEach((m) => {
+                ring.classList.remove(m);
+                dot.classList.remove(m);
+                ghost.classList.remove(m);
+                label.classList.remove(m);
+            });
+            label.style.opacity = "0";
             pullX = 0; pullY = 0;
         }
     }, { passive: true });
@@ -1628,7 +1697,12 @@ setInterval(fetchOnce, 30 * 1000);
     window.addEventListener("pointercancel", release);
     window.addEventListener("blur", release);
 
-    // Hide when the pointer leaves the window
-    document.addEventListener("mouseleave", () => document.body.classList.remove("cursor-ready"));
-    document.addEventListener("mouseenter", () => { if (ready) document.body.classList.add("cursor-ready"); });
+    // Hide when leaving viewport
+    document.addEventListener("mouseleave", () => {
+        document.body.classList.remove("cursor-ready");
+        label.style.opacity = "0";
+    });
+    document.addEventListener("mouseenter", () => {
+        if (ready) document.body.classList.add("cursor-ready");
+    });
 })();
