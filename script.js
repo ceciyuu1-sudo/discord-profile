@@ -63,7 +63,7 @@ const CONFIG = {
 
     // Replace each "#" with your real profile link.
     links: [
-        { label: "Discord",   href: "#" },
+        { label: "Discord",   href: "https://discord.gg/VspM673PMk" },
         { label: "TikTok",    href: "https://www.tiktok.com/@ceciyuu1" },
         { label: "Instagram", href: "https://www.instagram.com/ceciyuu1/" },
         { label: "Spotify",   href: "https://open.spotify.com/user/31bclur2u7at3vg5d3lavazxecqe" },
