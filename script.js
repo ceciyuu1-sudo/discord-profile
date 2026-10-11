@@ -1580,16 +1580,16 @@ setInterval(fetchOnce, 30 * 1000);
         recomputePull();
     }, { passive: true });
 
-    // Animation loop
+    // Animation loop: Smooth lerp interpolation directly centered on pointer
     (function loop() {
-        rx += (mx + pullX - rx) * 0.24;
-        ry += (my + pullY - ry) * 0.24;
-        gx += (mx - gx) * 0.12;
-        gy += (my - gy) * 0.12;
+        rx += (mx - rx) * 0.28;
+        ry += (my - ry) * 0.28;
+        gx += (mx - gx) * 0.14;
+        gy += (my - gy) * 0.14;
         dot.style.transform   = `translate3d(${mx}px, ${my}px, 0)`;
         ring.style.transform  = `translate3d(${rx}px, ${ry}px, 0)`;
         ghost.style.transform = `translate3d(${gx}px, ${gy}px, 0)`;
-        label.style.transform = `translate3d(${mx}px, ${my}px, 0)`;
+        label.style.transform = `translate3d(${mx + 16}px, ${my + 16}px, 0)`;
         requestAnimationFrame(loop);
     })();
 
@@ -1605,14 +1605,13 @@ setInterval(fetchOnce, 30 * 1000);
         if (el.closest(".zoomable, .lightbox-stage img, #banner-img, #avatar")) {
             return { mode: "mode-zoom", label: "Inspect ⌕" };
         }
-        // 3. Media cards (Favorites, Posters)
+        // 3. Media cards (Favorites cards, Posters) - only when over the card itself
         if (el.closest(".pcard")) {
             return { mode: "mode-card", label: "View Details" };
         }
-        // 4. Music Player & Spotify controls
-        if (el.closest(".player, #player, .pl-btn, .spotify-card, .lyrics-sync")) {
-            if (el.closest("#pl-toggle, #pl-next, #pl-prev")) return { mode: "mode-music", label: "Track ♫" };
-            return { mode: "mode-music", label: "Sound ♫" };
+        // 4. Music Player buttons & interactive controls
+        if (el.closest(".pl-btn, #pl-toggle, #pl-next, #pl-prev, #pl-mute, #pl-volume, .lyrics-sync")) {
+            return { mode: "mode-music", label: "Play ♫" };
         }
         // 5. Social Pills with brand styling
         const social = el.closest(".socials a");
@@ -1623,13 +1622,13 @@ setInterval(fetchOnce, 30 * 1000);
             if (brand.includes("instagram")) return { mode: "mode-instagram", label: "Instagram ✦" };
             if (brand.includes("tiktok"))    return { mode: "mode-tiktok",    label: "TikTok ♪" };
             if (brand.includes("github"))    return { mode: "mode-github",    label: "GitHub ⎇" };
-            return { mode: "mode-link", label: "External ↗" };
+            return { mode: "mode-link", label: "Open ↗" };
         }
         // 6. Like button
         if (el.closest(".like-btn")) {
             return { mode: "mode-link", label: "Love ♥" };
         }
-        // 7. Clan tag server popover
+        // 7. Clan tag server popover & button
         if (el.closest(".clan-tag, .popover-btn")) {
             return { mode: "mode-discord", label: "Server ✤" };
         }
