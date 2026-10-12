@@ -407,8 +407,26 @@ async function gameInfo(game) {
     return { icon: direct || found.icon, steamId: found.steamId };
 }
 
-function render(user) {
+// Sanity check: a song that Discord just reported as playing can't be at a negative
+// position, and (for a live update) can't already be over. If our clock says so, the
+// clock is wrong, so anchor to "just started" instead of freezing at 0:00 / the end.
+function guardClock(user, live) {
+    const t = user.listening_to_spotify && user.spotify && user.spotify.timestamps;
+    if (!t) return;
+    const key = t.start + ":" + t.end;
+    if (key === lastGuardKey) return;
+    lastGuardKey = key;
+    const total = t.end - t.start;
+    const e = Date.now() + clockSkew + guardSkew - t.start;
+    if (e < -3000 || (live && e > total + 6000)) {
+        guardSkew = (t.start + 1500) - (Date.now() + clockSkew);
+        console.warn("[clock] impossible song position (" + Math.round(e / 1000) + "s); re-anchored");
+    }
+}
+
+function render(user, live) {
     latest = user;
+    guardClock(user, !!live);
     const du = user.discord_user;
 
     if (du.avatar) {
@@ -590,6 +608,8 @@ function render(user) {
    ===================================================================== */
 let rawSkew = 0;      // real time minus this device's clock, in ms
 let clockSkew = 0;    // value we add to Date.now() everywhere
+let guardSkew = 0;    // emergency correction when the clock gives an impossible song position
+let lastGuardKey = "";
 
 // Reuse a previously measured skew so the very first second isn't wrong.
 try {
@@ -599,38 +619,58 @@ try {
     }
 } catch (e) {}
 
+// ISO strings without a zone ("2026-10-12T10:00:00.1234567") are parsed as LOCAL time by
+// Date.parse, which put every visitor's clock off by their timezone offset. Treat as UTC,
+// and trim to 3 fractional digits (Safari rejects more).
+function parseUtc(s) {
+    if (typeof s !== "string") return NaN;
+    s = s.replace(/(\.\d{3})\d+/, "$1");
+    if (!/(Z|[+-]\d\d:?\d\d)$/i.test(s)) s += "Z";
+    return Date.parse(s);
+}
+
 async function sampleSkew() {
-    // 1) timeapi.io — JSON, millisecond precision, CORS-enabled
+    const sane = (r) => (r && Number.isFinite(r.skew) && Math.abs(r.skew) < 3600_000 ? r : null);
+
+    // 1) timeapi.io: JSON, ms precision, CORS-enabled
     {
         const t0 = Date.now();
         try {
-            const res = await fetch("https://timeapi.io/api/Time/current/zone?timeZone=UTC",
-                                    { cache: "no-store" });
+            const res = await fetch("https://timeapi.io/api/Time/current/zone?timeZone=UTC", { cache: "no-store" });
             const t1 = Date.now();
             if (res.ok) {
                 const d = await res.json();
-                const ms = Date.parse(d.dateTime || d.dateTimeUtc || "");
-                if (Number.isFinite(ms)) {
-                    // API time is when the server assembled the response.
-                    // Response was generated at ~(t0+t1)/2 on our clock.
-                    return { skew: ms - (t0 + t1) / 2, rtt: t1 - t0, source: "timeapi.io" };
-                }
+                const ms = parseUtc(d.dateTime || d.dateTimeUtc || "");
+                const r = sane({ skew: ms - (t0 + t1) / 2, rtt: t1 - t0, source: "timeapi.io" });
+                if (r) return r;
             }
         } catch (e) {}
     }
-    // 2) Fallback: our own host's Date header (1-second resolution).
+    // 2) worldtimeapi.org
     {
         const t0 = Date.now();
         try {
-            const res = await fetch(location.pathname + "?__t=" + t0,
-                                    { method: "HEAD", cache: "no-store" });
+            const res = await fetch("https://worldtimeapi.org/api/timezone/Etc/UTC", { cache: "no-store" });
+            const t1 = Date.now();
+            if (res.ok) {
+                const d = await res.json();
+                const ms = parseUtc(d.utc_datetime || "");
+                const r = sane({ skew: ms - (t0 + t1) / 2, rtt: t1 - t0, source: "worldtimeapi" });
+                if (r) return r;
+            }
+        } catch (e) {}
+    }
+    // 3) Our own host's Date header (1-second resolution)
+    {
+        const t0 = Date.now();
+        try {
+            const res = await fetch(location.pathname + "?__t=" + t0, { method: "HEAD", cache: "no-store" });
             const t1 = Date.now();
             const h = res.headers.get("date");
             if (h) {
                 const ms = new Date(h).getTime();
-                if (Number.isFinite(ms)) {
-                    return { skew: (ms + 500) - (t0 + t1) / 2, rtt: t1 - t0, source: "date-header" };
-                }
+                const r = sane({ skew: (ms + 500) - (t0 + t1) / 2, rtt: t1 - t0, source: "date-header" });
+                if (r) return r;
             }
         } catch (e) {}
     }
@@ -655,6 +695,7 @@ async function syncClock() {
         return;
     }
     rawSkew = clockSkew = Math.round(best.skew);
+    if (best.rtt < 1500) guardSkew = 0;   // a good measurement replaces the emergency fix
     try {
         localStorage.setItem("clock:skew", JSON.stringify({ skew: rawSkew, at: Date.now() }));
     } catch (e) {}
@@ -690,7 +731,7 @@ function showDebug(now, t, over) {
 
 function tick() {
     if (!latest) return;
-    const now = Date.now() + clockSkew;
+    const now = Date.now() + clockSkew + guardSkew;
 
     const t = latest.listening_to_spotify && latest.spotify && latest.spotify.timestamps;
     // Song already finished (or paused) but Discord still lists it: show it as "Last played".
@@ -756,7 +797,7 @@ function connect() {
             ws.send(JSON.stringify({ op: 2, d: { subscribe_to_id: CONFIG.discordId } }));
             heartbeat = setInterval(() => ws.send(JSON.stringify({ op: 3 })), msg.d.heartbeat_interval);
         } else if (msg.op === 0 && msg.d) {
-            render(msg.d);
+            render(msg.d, msg.t === "PRESENCE_UPDATE");
         }
     };
     ws.onclose = () => {
@@ -1552,8 +1593,7 @@ setInterval(fetchOnce, 30 * 1000);
     document.body.append(ghost, ring, dot, label);
 
     let mx = -200, my = -200;      // pointer target
-    let rx = -200, ry = -200;      // ring  (eases behind)
-    let gx = -200, gy = -200;      // ghost (eases further behind)
+    let gx = -200, gy = -200;      // ghost (trails slightly, capped)
     let ready = false;
 
     window.addEventListener("pointermove", (e) => {
@@ -1562,32 +1602,39 @@ setInterval(fetchOnce, 30 * 1000);
         my = e.clientY;
         if (!ready) {
             ready = true;
-            rx = mx; ry = my;
             gx = mx; gy = my;
             document.body.classList.add("cursor-ready");
         }
     }, { passive: true });
 
-    // Half the ring's current size + a small gap, so the tag clears the ring
-    const labelGap = () => Math.round(ring.offsetWidth / 2) + 6;
+    // Fixed label geometry (measured on mode change, never per frame, so no layout thrash)
+    const LABEL_GAP = 26;
+    let lw = 0, lh = 0;
+    const measureLabel = () => { lw = label.offsetWidth; lh = label.offsetHeight; };
 
-    // Animation loop: Smooth lerp interpolation directly centered on pointer
-    (function loop() {
-        rx += (mx - rx) * 0.28;
-        ry += (my - ry) * 0.28;
-        gx += (mx - gx) * 0.14;
-        gy += (my - gy) * 0.14;
+    // Animation loop. Dot AND ring are pinned to the real pointer (zero lag, so
+    // the ring can never look displaced). Only the decorative ghost trails, using
+    // a time-based ease so low frame rates don't make it lag further behind, and
+    // its distance is capped so it can never drift far from the pointer.
+    let last = performance.now();
+    (function loop(now) {
+        const dt = Math.min(64, now - last); last = now;
+        const k = 1 - Math.exp(-dt / 70);
+        gx += (mx - gx) * k;
+        gy += (my - gy) * k;
+        const gdx = gx - mx, gdy = gy - my, gd = Math.hypot(gdx, gdy);
+        if (gd > 22) { gx = mx + gdx / gd * 22; gy = my + gdy / gd * 22; }
+
         dot.style.transform   = `translate3d(${mx}px, ${my}px, 0)`;
-        ring.style.transform  = `translate3d(${rx}px, ${ry}px, 0)`;
+        ring.style.transform  = `translate3d(${mx}px, ${my}px, 0)`;
         ghost.style.transform = `translate3d(${gx}px, ${gy}px, 0)`;
-        // Park the tag just outside the ring (never over the control), flip near edges
-        const off = labelGap();
-        const lw = label.offsetWidth, lh = label.offsetHeight;
-        const lx = (mx + off + lw > innerWidth  - 6) ? mx - off - lw : mx + off;
-        const ly = (my + off + lh > innerHeight - 6) ? my - off - lh : my + off;
+
+        // Park the tag just outside the ring, flip near viewport edges
+        const lx = (mx + LABEL_GAP + lw > innerWidth  - 6) ? mx - LABEL_GAP - lw : mx + LABEL_GAP;
+        const ly = (my + LABEL_GAP + lh > innerHeight - 6) ? my - LABEL_GAP - lh : my + LABEL_GAP;
         label.style.transform = `translate3d(${lx}px, ${ly}px, 0)`;
         requestAnimationFrame(loop);
-    })();
+    })(last);
 
     // Categorize element types for custom morphing & floating badge
     function getCursorMode(el) {
@@ -1659,6 +1706,7 @@ setInterval(fetchOnce, 30 * 1000);
             if (info.label) {
                 label.textContent = info.label;
                 label.style.opacity = "1";
+                measureLabel();
             } else {
                 label.style.opacity = "0";
             }
@@ -1677,6 +1725,18 @@ setInterval(fetchOnce, 30 * 1000);
         } else {
             applyMode(null);
         }
+    }, { passive: true });
+
+    // Re-check what's under the pointer when the page scrolls (no pointermove fires then)
+    let scrollTick = false;
+    window.addEventListener("scroll", () => {
+        if (scrollTick || !ready) return;
+        scrollTick = true;
+        requestAnimationFrame(() => {
+            scrollTick = false;
+            const t = document.elementFromPoint(mx, my);
+            applyMode(t ? getCursorMode(t) : null);
+        });
     }, { passive: true });
 
     // Pressed state
