@@ -451,9 +451,11 @@ function render(user, live) {
     cs.hidden = !csText;
     cs.textContent = csText || "";
 
+    // Spotify (rebuilt only when the track changes, so an open player or lyrics aren't interrupted)
     const sp = $("spotify-content");
-    const trackId = user.listening_to_spotify && user.spotify ? user.spotify.track_id : null;
-    document.querySelector(".spotify-card").classList.toggle("live", !!trackId);
+    const spCard = document.querySelector(".spotify-card");
+    const trackId = user.listening_to_spotify && user.spotify && !songOver(user) ? user.spotify.track_id : null;
+    spCard.classList.toggle("live", !!trackId);
     if (trackId !== shownTrack) {
         shownTrack = trackId;
         lyricLines = null;
@@ -471,8 +473,7 @@ function render(user, live) {
             npTag.append(eq, el("span", null, "Now playing"));
             row.querySelector(".text").prepend(npTag);
             sp.append(row);
-            // blurred album art behind the card (only for plain https image URLs)
-            const spCard = document.querySelector(".spotify-card");
+            // Blurred album art behind the card (only for plain https image URLs).
             if (/^https:\/\/[\w.\-\/]+$/.test(t.album_art_url || "")) spCard.style.setProperty("--art", `url("${t.album_art_url}")`);
             else spCard.style.removeProperty("--art");
             const prog = el("div", "progress");
@@ -514,6 +515,7 @@ function render(user, live) {
             lwrap.append(lbox, syncBtn);
             lyricsSyncBtn = syncBtn;
 
+            // Scrolling by hand stops the auto-follow until "Sync lyrics" is pressed.
             const detach = () => { if (lyricLines) { lyricsFollow = false; updateSyncBtn(); } };
             lbox.addEventListener("wheel", detach, { passive: true });
             lbox.addEventListener("touchmove", detach, { passive: true });
@@ -536,7 +538,8 @@ function render(user, live) {
             mount();
             mountLyrics();
         } else {
-            sp.append(emptyState("music", "Nothing playing", "Start Spotify and your track shows up here live."));
+            spCard.style.removeProperty("--art");
+            sp.append(emptyState("music", "Nothing playing", "Spotify tracks show up here live."));
         }
     }
 
@@ -610,6 +613,13 @@ let rawSkew = 0;      // real time minus this device's clock, in ms
 let clockSkew = 0;    // value we add to Date.now() everywhere
 let guardSkew = 0;    // emergency correction when the clock gives an impossible song position
 let lastGuardKey = "";
+
+// Song progress and lyrics are timed against the corrected clock. A song that should have
+// ended this long ago with no news from Discord is no longer shown as playing.
+const serverNow = () => Date.now() + clockSkew + guardSkew;
+const SONG_GRACE = 30000;
+const songOver = (user) => !!(user.spotify && user.spotify.timestamps) && serverNow() > user.spotify.timestamps.end + SONG_GRACE;
+let lastRefetch = 0;
 
 // Reuse a previously measured skew so the very first second isn't wrong.
 try {
@@ -731,12 +741,15 @@ function showDebug(now, t, over) {
 
 function tick() {
     if (!latest) return;
-    const now = Date.now() + clockSkew + guardSkew;
+    const now = serverNow();
 
-    const t = latest.listening_to_spotify && latest.spotify && latest.spotify.timestamps;
-    // Song already finished (or paused) but Discord still lists it: show it as "Last played".
-    const over = !!t && now > t.end + 4000;
-    if (DEBUG) showDebug(now, t, over);
+    const t = shownTrack && latest.spotify && latest.spotify.timestamps;
+    if (DEBUG) showDebug(now, t, !!t && now > t.end + 4000);
+    if (t && now > t.end + 2000) {
+        // Past the end of the song: the update may have been missed, so ask again; give up after the grace period.
+        if (now > t.end + SONG_GRACE) { render(latest); return; }
+        if (now - lastRefetch > 10000) { lastRefetch = now; fetchOnce(); }
+    }
     const fill = document.querySelector(".progress > span");
     if (t && fill) {
         const total = t.end - t.start;
@@ -747,18 +760,10 @@ function tick() {
         spans[1].textContent = fmt(total);
     }
 
-    const npTag = document.querySelector(".np-tag");
-    if (npTag && t) {
-        const label = npTag.querySelector("span:not(.eq)");
-        if (label) label.textContent = over ? "Last played" : "Now playing";
-        npTag.querySelectorAll(".eq i").forEach((bar) => { bar.style.animationPlayState = over ? "paused" : "running"; });
-    }
-
     if (t && lyricLines && lyricsBox) {
-        const pos = (now - t.start) / 1000 + (CONFIG.lyricsOffset || 0);
-        // If the song is over, don't jump to the last line.
+        const pos = (now - t.start) / 1000 + 0.25 + (CONFIG.lyricsOffset || 0);   // a line lights up just as it starts being sung
         let idx = -1;
-        if (!over) for (let i = 0; i < lyricLines.length && lyricLines[i].t <= pos; i++) idx = i;
+        for (let i = 0; i < lyricLines.length && lyricLines[i].t <= pos; i++) idx = i;
         if (idx !== activeLyric) {
             if (activeLyric >= 0 && lyricLines[activeLyric]) lyricLines[activeLyric].node.classList.remove("active");
             activeLyric = idx;
@@ -808,9 +813,38 @@ function connect() {
     ws.onerror = () => ws.close();
 }
 
+// Known platforms: [icon name on simpleicons.org, display name]
+const PLATFORMS = {
+    "github.com": ["github", "GitHub"], "steamcommunity.com": ["steam", "Steam"], "spotify.com": ["spotify", "Spotify"],
+    "twitch.tv": ["twitch", "Twitch"], "youtube.com": ["youtube", "YouTube"], "youtu.be": ["youtube", "YouTube"],
+    "tiktok.com": ["tiktok", "TikTok"], "instagram.com": ["instagram", "Instagram"], "x.com": ["x", "X"], "twitter.com": ["x", "X"],
+    "discord.gg": ["discord", "Discord"], "discord.com": ["discord", "Discord"], "kick.com": ["kick", "Kick"],
+    "reddit.com": ["reddit", "Reddit"], "soundcloud.com": ["soundcloud", "SoundCloud"], "snapchat.com": ["snapchat", "Snapchat"],
+    "t.me": ["telegram", "Telegram"], "roblox.com": ["roblox", "Roblox"]
+};
+
 CONFIG.links.forEach(({ label, href }) => {
     const a = el("a", null, label);
     a.dataset.brand = label.toLowerCase();
+    // A link to a known platform becomes an account card: its icon, its name and the handle from the address.
+    try {
+        const link = new URL(href);
+        const site = Object.keys(PLATFORMS).find((d) => link.hostname === d || link.hostname.endsWith(`.${d}`));
+        if (site) {
+            const [slug, name] = PLATFORMS[site];
+            const icon = el("img");
+            icon.alt = "";
+            icon.width = icon.height = 20;
+            icon.src = `https://cdn.simpleicons.org/${slug}/white`;
+            icon.onerror = () => icon.remove();
+            const handle = decodeURIComponent(link.pathname.split("/").filter(Boolean).pop() || "").replace(/^@/, "");
+            const text = el("span");
+            text.append(el("b", null, name), el("small", null, handle && handle.length < 30 ? handle : label));
+            a.replaceChildren(icon, text);
+            a.classList.add("account");
+            a.dataset.brand = slug;
+        }
+    } catch (e) { /* not a full web address: keep the plain pill */ }
     a.href = href;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
@@ -826,6 +860,7 @@ CONFIG.links.forEach(({ label, href }) => {
 
     const audio = $("bgm"), box = $("player"), toggle = $("pl-toggle");
     const prev = $("pl-prev"), next = $("pl-next"), titleEl = $("pl-title"), cover = $("pl-cover");
+    const seek = $("pl-seek"), timeEl = $("pl-time"), countEl = $("pl-count");
     const vol = $("pl-volume"), muteBtn = $("pl-mute"), collapse = $("pl-collapse");
     audio.loop = false;
     box.hidden = false;
@@ -864,6 +899,26 @@ CONFIG.links.forEach(({ label, href }) => {
     });
     paintVolume();
 
+    /* ---------- progress + seek ---------- */
+    const dur = () => (isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0);
+    let scrubbing = false;
+    function paintSeek(cur, total) {
+        cur = Math.min(Math.max(0, cur), total || cur);   // elapsed can never run past the song length
+        const frac = total ? cur / total : 0;
+        seek.value = Math.round(frac * 1000);
+        seek.style.setProperty("--v", (frac * 100).toFixed(2) + "%");
+        timeEl.textContent = `${fmt(cur * 1000)} / ${fmt(total * 1000)}`;
+    }
+    function paintProgress() { if (!scrubbing) paintSeek(audio.currentTime || 0, dur()); }
+    ["timeupdate", "loadedmetadata", "durationchange", "emptied"].forEach((ev) => audio.addEventListener(ev, paintProgress));
+    seek.addEventListener("input", () => { scrubbing = true; paintSeek(seek.value / 1000 * dur(), dur()); });
+    seek.addEventListener("change", () => {
+        if (dur()) audio.currentTime = seek.value / 1000 * dur();
+        scrubbing = false;
+        paintProgress();
+    });
+    paintProgress();
+
     /* ---------- queue (shuffled so nothing repeats until all have played) ---------- */
     let order = [], pos = 0, current = 0, failures = 0;
     const makeOrder = (avoid) => {
@@ -883,11 +938,18 @@ CONFIG.links.forEach(({ label, href }) => {
         current = n;
         const song = list[n];
         audio.src = song.src;
-        titleEl.textContent = song.title || "Music";
+        // "Song · Artist" when the song has an artist: "..."  in CONFIG.playlist
+        titleEl.textContent = song.artist ? `${song.title || "Music"} · ${song.artist}` : (song.title || "Music");
         titleEl.title = titleEl.textContent;
+        countEl.textContent = list.length > 1 ? `${pos + 1}/${list.length}` : "";
+        paintProgress();
         box.classList.remove("has-cover");
-        cover.onload = () => box.classList.add("has-cover");
-        cover.onerror = () => box.classList.remove("has-cover");
+        box.style.removeProperty("--art");
+        cover.onload = () => {
+            box.classList.add("has-cover");
+            box.style.setProperty("--art", `url("${cover.currentSrc || cover.src}")`);   // blurred behind the card
+        };
+        cover.onerror = () => { box.classList.remove("has-cover"); box.style.removeProperty("--art"); };
         cover.src = coverFor(song);
         try {
             if ("mediaSession" in navigator) {
@@ -1571,195 +1633,54 @@ setInterval(fetchOnce, 30 * 1000);
 
 /* =========================================
    CUSTOM CURSOR
-   Three layers: a dot that sits exactly on the pointer, a ring that
-   eases behind it, and a fainter ghost ring trailing further back.
-   The ring grows over clickable elements but always stays centred on the pointer.
-   Skipped on touch devices and for reduced-motion users.
+   A dot on the pointer and a thin ring that eases behind it. The ring grows over
+   anything clickable and shrinks while pressed. Mouse users only: skipped on touch.
    ========================================= */
 (function customCursor() {
-    // Skip on touch-only mobile devices if touch event is primary
-    if (window.matchMedia && window.matchMedia("(pointer: coarse)").matches && !window.matchMedia("(pointer: fine)").matches) {
-        return;
-    }
+    if (!matchMedia("(hover: hover) and (pointer: fine)").matches) return;
 
-    const dot   = document.createElement("div");
-    const ring  = document.createElement("div");
-    const ghost = document.createElement("div");
-    const label = document.createElement("div");
-    dot.className   = "cursor-dot";
-    ring.className  = "cursor-ring";
-    ghost.className = "cursor-ghost";
-    label.className = "cursor-label";
-    document.body.append(ghost, ring, dot, label);
+    const dot = document.createElement("div");
+    const ring = document.createElement("div");
+    dot.className = "cursor-dot";
+    ring.className = "cursor-ring";
+    document.body.append(ring, dot);
 
-    let mx = -200, my = -200;      // pointer target
-    let gx = -200, gy = -200;      // ghost (trails slightly, capped)
-    let ready = false;
+    const CLICKABLE = "a, button, input, textarea, select, label, summary, [role='button'], .pcard, .zoomable, .like-btn, .clan-tag";
+    const EASE = 70;                  // ring lag in ms: bigger = lazier ring
+    let mx = -200, my = -200, rx = -200, ry = -200, seen = false;
+
+    const show = (on) => { dot.classList.toggle("show", on); ring.classList.toggle("show", on); };
 
     window.addEventListener("pointermove", (e) => {
         if (e.pointerType === "touch") return;
-        mx = e.clientX;
-        my = e.clientY;
-        if (!ready) {
-            ready = true;
-            gx = mx; gy = my;
-            document.body.classList.add("cursor-ready");
+        mx = e.clientX; my = e.clientY;
+        if (!seen) {                  // first move: put the ring under the dot, then hide the system cursor
+            seen = true;
+            rx = mx; ry = my;
+            document.body.classList.add("has-cursor");
         }
+        show(true);
+        const t = e.target;
+        ring.classList.toggle("on", !!(t && t.closest && t.closest(CLICKABLE)));
     }, { passive: true });
 
-    // Fixed label geometry (measured on mode change, never per frame, so no layout thrash)
-    const LABEL_GAP = 26;
-    let lw = 0, lh = 0;
-    const measureLabel = () => { lw = label.offsetWidth; lh = label.offsetHeight; };
-
-    // Animation loop. Dot AND ring are pinned to the real pointer (zero lag, so
-    // the ring can never look displaced). Only the decorative ghost trails, using
-    // a time-based ease so low frame rates don't make it lag further behind, and
-    // its distance is capped so it can never drift far from the pointer.
-    let last = performance.now();
-    (function loop(now) {
-        const dt = Math.min(64, now - last); last = now;
-        const k = 1 - Math.exp(-dt / 70);
-        gx += (mx - gx) * k;
-        gy += (my - gy) * k;
-        const gdx = gx - mx, gdy = gy - my, gd = Math.hypot(gdx, gdy);
-        if (gd > 22) { gx = mx + gdx / gd * 22; gy = my + gdy / gd * 22; }
-
-        dot.style.transform   = `translate3d(${mx}px, ${my}px, 0)`;
-        ring.style.transform  = `translate3d(${mx}px, ${my}px, 0)`;
-        ghost.style.transform = `translate3d(${gx}px, ${gy}px, 0)`;
-
-        // Park the tag just outside the ring, flip near viewport edges
-        const lx = (mx + LABEL_GAP + lw > innerWidth  - 6) ? mx - LABEL_GAP - lw : mx + LABEL_GAP;
-        const ly = (my + LABEL_GAP + lh > innerHeight - 6) ? my - LABEL_GAP - lh : my + LABEL_GAP;
-        label.style.transform = `translate3d(${lx}px, ${ly}px, 0)`;
-        requestAnimationFrame(loop);
-    })(last);
-
-    // Categorize element types for custom morphing & floating badge
-    function getCursorMode(el) {
-        if (!el || el === document.body || el === document.documentElement) return null;
-
-        // 1. Text input / forms
-        if (el.closest("textarea, input[type='text'], input:not([type]), [contenteditable='true']")) {
-            return { mode: "mode-text", label: "" };
-        }
-        // 2. Lightbox / zoomable images
-        if (el.closest(".zoomable, .lightbox-stage img, #banner-img, #avatar")) {
-            return { mode: "mode-zoom", label: "Inspect ⌕" };
-        }
-        // 3. Media cards (Favorites cards, Posters) - only when over the card itself
-        if (el.closest(".pcard")) {
-            return { mode: "mode-card", label: "View Details" };
-        }
-        // 4. Music Player buttons & interactive controls
-        if (el.closest(".pl-btn, #pl-toggle, #pl-next, #pl-prev, #pl-mute, #pl-volume, #pl-collapse, .lyrics-sync")) {
-            return { mode: "mode-music", label: "Play ♫" };
-        }
-        // 5. Social Pills with brand styling
-        const social = el.closest(".socials a");
-        if (social) {
-            const brand = (social.dataset.brand || social.textContent).toLowerCase().trim();
-            if (brand.includes("discord"))   return { mode: "mode-discord",   label: "Discord ✤" };
-            if (brand.includes("spotify"))   return { mode: "mode-spotify",   label: "Spotify ♬" };
-            if (brand.includes("instagram")) return { mode: "mode-instagram", label: "Instagram ✦" };
-            if (brand.includes("tiktok"))    return { mode: "mode-tiktok",    label: "TikTok ♪" };
-            if (brand.includes("github"))    return { mode: "mode-github",    label: "GitHub ⎇" };
-            return { mode: "mode-link", label: "Open ↗" };
-        }
-        // 6. Like button
-        if (el.closest(".like-btn")) {
-            return { mode: "mode-link", label: "Love ♥" };
-        }
-        // 7. Clan tag server popover & button
-        if (el.closest(".clan-tag, .popover-btn")) {
-            return { mode: "mode-discord", label: "Server ✤" };
-        }
-        // 8. General buttons / links (real controls only, not the cards that contain them)
-        if (el.closest("a[href], button, [role='button'], .btn, .gb-post, .gb-signin, .gb-del")) {
-            return { mode: "mode-link", label: "" };
-        }
-        return null;
-    }
-
-    const ALL_MODES = [
-        "mode-link", "mode-music", "mode-card", "mode-text", "mode-zoom",
-        "mode-discord", "mode-spotify", "mode-instagram", "mode-tiktok", "mode-github"
-    ];
-
-    let currentMode = null;
-    function applyMode(info) {
-        const nextMode = info ? info.mode : null;
-        if (nextMode === currentMode) return;
-        currentMode = nextMode;
-        ALL_MODES.forEach((m) => {
-            ring.classList.remove(m);
-            dot.classList.remove(m);
-            ghost.classList.remove(m);
-            label.classList.remove(m);
-        });
-        if (info) {
-            ring.classList.add(info.mode);
-            dot.classList.add(info.mode);
-            ghost.classList.add(info.mode);
-            label.classList.add(info.mode);
-            if (info.label) {
-                label.textContent = info.label;
-                label.style.opacity = "1";
-                measureLabel();
-            } else {
-                label.style.opacity = "0";
-            }
-        } else {
-            label.style.opacity = "0";
-        }
-    }
-
-    document.addEventListener("pointermove", (e) => {
-        if (e.pointerType === "touch") return;
-        const target = e.target;
-        if (!target || target.nodeType !== 1) return;
-        const info = getCursorMode(target);
-        if (info) {
-            applyMode(info);
-        } else {
-            applyMode(null);
-        }
-    }, { passive: true });
-
-    // Re-check what's under the pointer when the page scrolls (no pointermove fires then)
-    let scrollTick = false;
-    window.addEventListener("scroll", () => {
-        if (scrollTick || !ready) return;
-        scrollTick = true;
-        requestAnimationFrame(() => {
-            scrollTick = false;
-            const t = document.elementFromPoint(mx, my);
-            applyMode(t ? getCursorMode(t) : null);
-        });
-    }, { passive: true });
-
-    // Pressed state
-    window.addEventListener("pointerdown", () => {
-        dot.classList.add("is-down");
-        ring.classList.add("is-down");
-        ghost.classList.add("is-down");
-    });
-    const release = () => {
-        dot.classList.remove("is-down");
-        ring.classList.remove("is-down");
-        ghost.classList.remove("is-down");
-    };
+    window.addEventListener("pointerdown", () => ring.classList.add("down"));
+    const release = () => ring.classList.remove("down");
     window.addEventListener("pointerup", release);
     window.addEventListener("pointercancel", release);
     window.addEventListener("blur", release);
 
-    // Hide when leaving viewport
-    document.addEventListener("mouseleave", () => {
-        document.body.classList.remove("cursor-ready");
-        label.style.opacity = "0";
-    });
-    document.addEventListener("mouseenter", () => {
-        if (ready) document.body.classList.add("cursor-ready");
-    });
+    document.addEventListener("mouseleave", () => show(false));
+    document.addEventListener("mouseenter", () => { if (seen) show(true); });
+
+    let last = performance.now();
+    (function loop(now) {
+        const k = 1 - Math.exp(-Math.min(64, now - last) / EASE);
+        last = now;
+        rx += (mx - rx) * k;
+        ry += (my - ry) * k;
+        dot.style.transform = `translate3d(${mx}px, ${my}px, 0)`;
+        ring.style.transform = `translate3d(${rx}px, ${ry}px, 0)`;
+        requestAnimationFrame(loop);
+    })(last);
 })();

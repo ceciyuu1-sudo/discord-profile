@@ -54,43 +54,122 @@ body {
     left: 20px;
     z-index: 5;
     display: flex;
-    gap: 12px;
-    width: min(290px, calc(100vw - 40px));
-    padding: 10px;
-    background: rgba(20, 20, 25, .88);
-    backdrop-filter: blur(8px);
-    border: 1px solid #333;
-    border-radius: 14px;
+    align-items: center;
+    gap: 16px;
+    width: min(340px, calc(100vw - 40px));
+    padding: 16px 18px 14px 16px;
+    background: rgba(20, 18, 22, .92);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, .13);
+    border-radius: 18px;
+    overflow: hidden;
+    isolation: isolate;
     font-size: .8rem;
     color: var(--text);
+    box-shadow: 0 10px 34px rgba(0, 0, 0, .5);
     transition: border-color .25s, box-shadow .25s;
 }
 .player[hidden] { display: none; }
-.player:hover { border-color: #4a4a54; }
-.player.playing { border-color: color-mix(in srgb, var(--accent) 70%, transparent); box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 20%, transparent); }
+/* the song's cover, blurred, glowing through the card */
+.player::before {
+    content: "";
+    position: absolute;
+    inset: -30px;
+    z-index: -2;
+    background: var(--art, none) center / cover no-repeat;
+    filter: blur(26px) saturate(1.5);
+    opacity: .8;
+}
+.player::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(100deg, rgba(22, 14, 16, .4) 0%, rgba(22, 22, 28, .78) 55%, rgba(24, 24, 30, .92) 100%);
+}
+.player:hover { border-color: rgba(255, 255, 255, .22); }
+.player.playing { border-color: rgba(255, 255, 255, .16); box-shadow: 0 10px 34px rgba(0, 0, 0, .5), 0 0 26px color-mix(in srgb, var(--accent) 16%, transparent); }
 
+/* record: red ring, spinning cover, centre hole and a marker so the spin is visible */
 .pl-cover-wrap {
     position: relative;
     flex: none;
-    width: 70px; height: 70px;
+    width: 76px; height: 76px;
+    border-radius: 50%;
+    padding: 3px;
+    background: color-mix(in srgb, var(--accent) 82%, #000);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, .45), 0 6px 18px rgba(0, 0, 0, .45);
+    transition: width .2s, height .2s;
+}
+.pl-disc {
+    position: relative;
+    width: 100%; height: 100%;
     display: grid; place-items: center;
-    border-radius: 10px;
+    border-radius: 50%;
     overflow: hidden;
     background: radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--accent) 30%, #1a1a20), #0d0d11 75%);
     color: var(--accent);
     font-size: 1.7rem;
-    transition: width .2s, height .2s;
+    animation: plSpin 9s linear infinite;
+    animation-play-state: paused;
 }
+.player.playing .pl-disc { animation-play-state: running; }
+@keyframes plSpin { to { transform: rotate(360deg); } }
 .pl-cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none; }
 .player.has-cover .pl-cover { display: block; }
 .player.has-cover .pl-note { display: none; }
+.pl-note { position: absolute; top: 14%; left: 50%; transform: translateX(-50%); line-height: 1; }
+.pl-hole {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 22%; aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: #000;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 38%, #000), inset 0 0 0 1px rgba(255, 255, 255, .08);
+}
+.pl-dot {
+    position: absolute;
+    left: 25%; top: 68%;
+    width: 7%; aspect-ratio: 1;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+}
 
-.pl-body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 4px; }
-.pl-top { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.pl-label { font-size: .58rem; letter-spacing: .22em; text-transform: uppercase; color: var(--faint); }
-.pl-title { font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.pl-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pl-label { font-size: .6rem; letter-spacing: .24em; text-transform: uppercase; color: #a9a3a8; white-space: nowrap; }
+.pl-count { margin-left: auto; font-size: .66rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pl-count:empty { display: none; }
+.pl-eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; flex: none; }
+.pl-eq i {
+    width: 3px; height: 100%;
+    border-radius: 1px;
+    background: var(--accent);
+    transform-origin: bottom;
+    animation: plEq 1s ease-in-out infinite;
+    animation-play-state: paused;
+}
+.pl-eq i:nth-child(1) { transform: scaleY(.45); animation-delay: -.5s; }
+.pl-eq i:nth-child(2) { transform: scaleY(1);   animation-delay: -.15s; }
+.pl-eq i:nth-child(3) { transform: scaleY(.7);  animation-delay: -.8s; }
+.player.playing .pl-eq i { animation-play-state: running; }
+@keyframes plEq { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
 
-.pl-controls { display: flex; align-items: center; gap: 2px; }
+.pl-title {
+    font-family: 'Space Grotesk', 'JetBrains Mono', sans-serif;
+    font-weight: 700;
+    font-size: 1.02rem;
+    line-height: 1.25;
+    color: #fff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.pl-seek-row { display: flex; align-items: center; gap: 10px; }
+.pl-time { flex: none; font-size: .64rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.pl-controls { display: flex; align-items: center; gap: 6px; }
 .pl-btn {
     width: 30px; height: 30px;
     display: grid; place-items: center;
@@ -107,8 +186,8 @@ body {
 .pl-btn .stroke { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .pl-btn:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); color: #fff; }
 .pl-btn:active { transform: scale(.92); }
-.pl-main { width: 36px; height: 36px; background: var(--accent); color: #fff; margin: 0 2px; }
-.pl-main svg { width: 18px; height: 18px; }
+.pl-main { width: 40px; height: 40px; background: var(--accent); color: #fff; margin: 0 2px; box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 45%, transparent); }
+.pl-main svg { width: 20px; height: 20px; }
 .pl-main:hover { background: color-mix(in srgb, var(--accent) 80%, #fff); }
 .pl-min { margin-left: auto; }
 .pl-min svg { transition: transform .2s; }
@@ -121,22 +200,32 @@ body {
 
 .pl-vol { display: flex; align-items: center; gap: 4px; }
 .pl-mute { width: 26px; height: 26px; }
-.pl-vol input[type="range"] {
+.pl-vol input[type="range"],
+.pl-seek-row input[type="range"] {
     -webkit-appearance: none; appearance: none;
     flex: 1; min-width: 0;
     height: 4px;
+    padding: 6px 0;                 /* taller hit area, only the 4px bar is painted */
+    box-sizing: content-box;
+    background-clip: content-box;
     border-radius: 2px;
-    background: linear-gradient(to right, var(--accent) var(--v, 60%), #34343c var(--v, 60%));
+    background-color: transparent;
+    background-image: linear-gradient(to right, var(--accent) var(--v, 60%), rgba(255, 255, 255, .22) var(--v, 60%));
     cursor: pointer;
 }
-.pl-vol input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 0 0 3px rgba(0, 0, 0, .25); }
-.pl-vol input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; }
-.pl-vol input[type="range"]::-moz-range-track { background: transparent; }
+.pl-seek-row input[type="range"] { --v: 0%; }
+.pl-vol input[type="range"]::-webkit-slider-thumb,
+.pl-seek-row input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 0 0 3px rgba(0, 0, 0, .25); }
+.pl-vol input[type="range"]::-moz-range-thumb,
+.pl-seek-row input[type="range"]::-moz-range-thumb { width: 13px; height: 13px; border-radius: 50%; background: #fff; border: 0; }
+.pl-vol input[type="range"]::-moz-range-track,
+.pl-seek-row input[type="range"]::-moz-range-track { background: transparent; }
 
-/* minimized: just the cover and play/pause */
-.player.min { width: auto; align-items: center; padding: 8px; }
-.player.min .pl-cover-wrap { width: 44px; height: 44px; font-size: 1.2rem; }
-.player.min .pl-top, .player.min .pl-vol, .player.min #pl-prev, .player.min #pl-next { display: none; }
+/* minimized: just the record and play/pause */
+.player.min { width: auto; align-items: center; padding: 10px; gap: 12px; }
+.player.min .pl-cover-wrap { width: 48px; height: 48px; padding: 2px; font-size: 1.1rem; }
+.player.min .pl-top, .player.min .pl-title, .player.min .pl-seek-row, .player.min .pl-vol, .player.min #pl-prev, .player.min #pl-next { display: none; }
+.player.min .pl-main { width: 36px; height: 36px; }
 .player.min .pl-min svg { transform: rotate(180deg); }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
@@ -1480,231 +1569,30 @@ html { scroll-behavior: smooth; }
 .media-ph svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .media-ph svg .f { fill: currentColor; stroke: none; }
 
-/* =========================================
-   CUSTOM CURSOR
-   A red dot sits exactly on the pointer; a ring eases behind it and
-   grows over anything clickable; a fainter ghost ring trails further
-   back.
-   ========================================= */
+/* connected accounts: a link to a known platform, shown as a card with its icon */
+.socials a.account { display: inline-flex; align-items: center; gap: 10px; padding: 9px 16px 9px 12px; border-radius: 14px; text-align: left; }
+.socials a.account span { display: flex; flex-direction: column; line-height: 1.2; }
+.socials a.account b { font-size: .8rem; color: var(--text); }
+.socials a.account small { font-size: .66rem; color: var(--muted); max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.socials a.account:is(:hover, :focus-visible) b, .socials a.account:is(:hover, :focus-visible) small { color: inherit; }
+.socials a[data-brand="steam"]      { --brand: #1b2838; --line-bg: #66c0f4; --line-glow: #66c0f4; }
+.socials a[data-brand="twitch"]     { --brand: #9146ff; --line-bg: #9146ff; --line-glow: #9146ff; }
+.socials a[data-brand="youtube"]    { --brand: #ff0033; --line-bg: #ff0033; --line-glow: #ff0033; }
+.socials a[data-brand="x"]          { --brand: #000; --line-bg: #fff; --line-glow: #fff; }
+.socials a[data-brand="kick"]       { --brand: #53fc18; --brand-text: #08130c; --line-bg: #53fc18; --line-glow: #53fc18; }
+.socials a[data-brand="reddit"]     { --brand: #ff4500; --line-bg: #ff4500; --line-glow: #ff4500; }
+.socials a[data-brand="soundcloud"] { --brand: #ff5500; --line-bg: #ff5500; --line-glow: #ff5500; }
+.socials a[data-brand="telegram"]   { --brand: #26a5e4; --line-bg: #26a5e4; --line-glow: #26a5e4; }
 
-/* Hide the system cursor only when custom cursor is actively running */
-body.cursor-ready,
-body.cursor-ready * {
-    cursor: none !important;
-}
-
-    .cursor-dot,
-    .cursor-ring,
-    .cursor-ghost,
-    .cursor-label {
-        position: fixed;
-        top: 0;
-        left: 0;
-        pointer-events: none;
-        z-index: 9999999;
-        border-radius: 50%;
-        opacity: 0;
-        will-change: transform, width, height, background-color, border-color, box-shadow;
-        transition: opacity .25s ease;
-    }
-
-    /* ---- 1. Precision Center Dot / Reticle ---- */
-    .cursor-dot {
-        width: 6px;
-        height: 6px;
-        margin: -3px 0 0 -3px;
-        background: var(--accent);
-        box-shadow:
-            0 0 10px var(--accent),
-            0 0 22px color-mix(in srgb, var(--accent) 70%, transparent);
-        transition:
-            opacity .25s ease,
-            scale .2s cubic-bezier(.2, .9, .3, 1.3),
-            background-color .2s ease,
-            box-shadow .2s ease;
-    }
-
-    /* ---- 2. Primary Fluid Ring ---- */
-    .cursor-ring {
-        width: 28px;
-        height: 28px;
-        margin: -14px 0 0 -14px;
-        border: 1.5px solid color-mix(in srgb, var(--accent) 80%, transparent);
-        background: transparent;
-        box-shadow:
-            0 0 15px color-mix(in srgb, var(--accent) 35%, transparent),
-            inset 0 0 8px color-mix(in srgb, var(--accent) 15%, transparent);
-        transition:
-            opacity .25s ease,
-            width .25s cubic-bezier(.2, .9, .3, 1.4),
-            height .25s cubic-bezier(.2, .9, .3, 1.4),
-            margin .25s cubic-bezier(.2, .9, .3, 1.4),
-            background-color .25s ease,
-            border-color .25s ease,
-            border-radius .25s ease,
-            box-shadow .25s ease;
-    }
-
-    /* ---- 3. Outer Trailing Ghost Ring ---- */
-    .cursor-ghost {
-        width: 14px;
-        height: 14px;
-        margin: -7px 0 0 -7px;
-        border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
-        transition:
-            opacity .25s ease,
-            border-color .25s ease,
-            scale .25s ease;
-    }
-
-    /* ---- 4. Floating Context Pill Badge ---- */
-    .cursor-label {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.54rem;
-        font-weight: 700;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        color: #fff;
-        background: rgba(10, 10, 14, 0.95);
-        border: 1px solid var(--accent);
-        padding: 1px 6px;
-        border-radius: 4px;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.7);
-        white-space: nowrap;
-        margin: 0;
-        transform-origin: top left;
-        transition: opacity .18s ease, border-color .18s ease;
-    }
-
-    /* Reveal once pointer moves */
-    body.cursor-ready .cursor-dot   { opacity: 1; }
-    body.cursor-ready .cursor-ring  { opacity: 1; }
-    body.cursor-ready .cursor-ghost { opacity: .35; }
-
-    /* ========================================================
-       CONTEXTUAL MORPHING STATES
-       ======================================================== */
-
-    /* [Default Clickable / Link] */
-    .cursor-ring.mode-link {
-        width: 36px;
-        height: 36px;
-        margin: -18px 0 0 -18px;
-        background: color-mix(in srgb, var(--accent) 12%, transparent);
-        border-color: var(--accent);
-        box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 45%, transparent);
-    }
-    .cursor-dot.mode-link {
-        scale: .6;
-        background: #fff;
-    }
-
-    /* [Music / Audio Controls] */
-    .cursor-ring.mode-music {
-        width: 36px;
-        height: 36px;
-        margin: -18px 0 0 -18px;
-        border-color: #1ed760;
-        background: rgba(30, 215, 96, 0.12);
-        box-shadow: 0 0 20px rgba(30, 215, 96, 0.4);
-    }
-    .cursor-dot.mode-music {
-        background: #1ed760;
-        box-shadow: 0 0 10px #1ed760;
-        scale: 0.8;
-    }
-    .cursor-ghost.mode-music {
-        border-color: rgba(30, 215, 96, 0.5);
-        scale: 1.2;
-    }
-    .cursor-label.mode-music {
-        border-color: #1ed760;
-        color: #1ed760;
-    }
-
-    /* [Cards / Posters / Gallery preview] */
-    .cursor-ring.mode-card {
-        width: 42px;
-        height: 42px;
-        margin: -21px 0 0 -21px;
-        border-radius: 10px;
-        border-color: #ff3355;
-        background: rgba(255, 51, 85, 0.08);
-        box-shadow: 0 0 22px rgba(255, 51, 85, 0.3);
-    }
-    .cursor-dot.mode-card {
-        scale: 0.5;
-        background: #fff;
-    }
-    .cursor-label.mode-card {
-        border-color: var(--accent);
-    }
-
-    /* [Text Input / Form / Message Wall] */
-    .cursor-ring.mode-text {
-        width: 4px;
-        height: 28px;
-        margin: -14px 0 0 -2px;
-        border-radius: 2px;
-        border: none;
-        background: var(--accent);
-        box-shadow: 0 0 12px var(--accent);
-    }
-    .cursor-dot.mode-text {
-        opacity: 0;
-    }
-    .cursor-ghost.mode-text {
-        opacity: 0;
-    }
-
-    /* [Zoom / Lightbox preview] */
-    .cursor-ring.mode-zoom {
-        width: 42px;
-        height: 42px;
-        margin: -21px 0 0 -21px;
-        border-style: dashed;
-        border-color: #fff;
-        background: rgba(255, 255, 255, 0.08);
-        box-shadow: 0 0 20px rgba(255, 255, 255, 0.35);
-    }
-    .cursor-dot.mode-zoom {
-        scale: 0.5;
-        background: #fff;
-    }
-
-    /* [Brand-Specific Hover on Social Pills] */
-    .cursor-ring.mode-discord   { border-color: #5865f2; background: rgba(88, 101, 242, 0.2); box-shadow: 0 0 24px rgba(88, 101, 242, 0.5); }
-    .cursor-dot.mode-discord    { background: #5865f2; box-shadow: 0 0 10px #5865f2; }
-    .cursor-label.mode-discord  { border-color: #5865f2; color: #7289da; }
-
-    .cursor-ring.mode-spotify   { border-color: #1ed760; background: rgba(30, 215, 96, 0.2); box-shadow: 0 0 24px rgba(30, 215, 96, 0.5); }
-    .cursor-dot.mode-spotify    { background: #1ed760; box-shadow: 0 0 10px #1ed760; }
-    .cursor-label.mode-spotify  { border-color: #1ed760; color: #1ed760; }
-
-    .cursor-ring.mode-instagram { border-color: #e4405f; background: rgba(228, 64, 95, 0.2); box-shadow: 0 0 24px rgba(228, 64, 95, 0.5); }
-    .cursor-dot.mode-instagram  { background: #e4405f; box-shadow: 0 0 10px #e4405f; }
-    .cursor-label.mode-instagram{ border-color: #e4405f; color: #e4405f; }
-
-    .cursor-ring.mode-tiktok    { border-color: #25f4ee; background: rgba(37, 244, 238, 0.2); box-shadow: 0 0 24px rgba(37, 244, 238, 0.5); }
-    .cursor-dot.mode-tiktok     { background: #25f4ee; box-shadow: 0 0 10px #25f4ee; }
-    .cursor-label.mode-tiktok   { border-color: #25f4ee; color: #25f4ee; }
-
-    .cursor-ring.mode-github    { border-color: #f2f2f4; background: rgba(242, 242, 244, 0.2); box-shadow: 0 0 24px rgba(242, 242, 244, 0.5); }
-    .cursor-dot.mode-github     { background: #f2f2f4; box-shadow: 0 0 10px #f2f2f4; }
-    .cursor-label.mode-github   { border-color: #f2f2f4; color: #f2f2f4; }
-
-    /* ---- Click / Down State (uses scale property so it doesn't break translate3d) ---- */
-    .cursor-ring.is-down {
-        scale: 0.72;
-        background: color-mix(in srgb, var(--accent) 30%, transparent) !important;
-    }
-    .cursor-dot.is-down {
-        scale: 0.4;
-    }
-    .cursor-ghost.is-down {
-        opacity: 0 !important;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        .cursor-dot, .cursor-ring, .cursor-ghost, .cursor-label { transition: none !important; }
-    }
+/* =========================================================
+   CUSTOM CURSOR (mouse users only)
+   A small glowing dot sits on the pointer; a thin ring eases behind it,
+   grows over anything clickable and shrinks while pressed.
+   ========================================================= */
+.has-cursor, .has-cursor * { cursor: none !important; }
+.cursor-dot, .cursor-ring { position: fixed; left: 0; top: 0; z-index: 9999; border-radius: 50%; pointer-events: none; opacity: 0; }
+.cursor-dot { width: 6px; height: 6px; margin: -3px 0 0 -3px; background: var(--accent); box-shadow: 0 0 10px var(--accent); transition: opacity .2s; }
+.cursor-ring { width: 34px; height: 34px; margin: -17px 0 0 -17px; border: 1.5px solid color-mix(in srgb, var(--accent) 75%, transparent); transition: opacity .2s, width .2s, height .2s, margin .2s, background .2s; }
+.cursor-ring.on { width: 52px; height: 52px; margin: -26px 0 0 -26px; background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.cursor-ring.down { width: 24px; height: 24px; margin: -12px 0 0 -12px; }
+.cursor-dot.show, .cursor-ring.show { opacity: 1; }

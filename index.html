@@ -23,13 +23,23 @@
 
     <aside class="player" id="player" aria-label="Music player" hidden>
         <div class="pl-cover-wrap">
-            <img class="pl-cover" id="pl-cover" alt="">
-            <span class="pl-note" aria-hidden="true">♪</span>
+            <div class="pl-disc">
+                <img class="pl-cover" id="pl-cover" alt="">
+                <span class="pl-note" aria-hidden="true">♪</span>
+                <span class="pl-hole" aria-hidden="true"></span>
+                <span class="pl-dot" aria-hidden="true"></span>
+            </div>
         </div>
         <div class="pl-body">
             <div class="pl-top">
+                <span class="pl-eq" aria-hidden="true"><i></i><i></i><i></i></span>
                 <span class="pl-label">Now playing</span>
-                <span class="pl-title" id="pl-title" aria-live="polite">Music</span>
+                <span class="pl-count" id="pl-count" aria-label="Track number"></span>
+            </div>
+            <div class="pl-title" id="pl-title" aria-live="polite">Music</div>
+            <div class="pl-seek-row">
+                <input id="pl-seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
+                <span class="pl-time" id="pl-time">0:00 / 0:00</span>
             </div>
             <div class="pl-controls">
                 <button class="pl-btn" id="pl-prev" type="button" aria-label="Previous song">
